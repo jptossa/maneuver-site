@@ -11,7 +11,11 @@ export const ACTIVITY_TYPES = [
 ] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 
-export const TIMESCALES = ["day", "week", "month", "year"] as const;
+// Keep in sync with the CHECK constraint in supabase/migrations/0003_activities_status.sql.
+export const ACTIVITY_STATUSES = ["planned", "completed"] as const;
+export type ActivityStatus = (typeof ACTIVITY_STATUSES)[number];
+
+export const TIMESCALES =["day", "week", "month", "year"] as const;
 export type Timescale = (typeof TIMESCALES)[number];
 
 export const METRICS = ["minutes", "distance", "sessions"] as const;
@@ -23,15 +27,17 @@ export interface Activity {
   /** ISO date, yyyy-MM-dd */
   date: string;
   type: ActivityType;
+  status: ActivityStatus;
   durationMin: number;
   distanceKm: number | null;
   notes?: string;
 }
 
-/** Fields a user supplies when logging an activity (an Activity minus its id). */
+/** Fields a user supplies when logging or planning an activity (an Activity minus its id). */
 export interface ActivityInput {
   date: string;
   type: ActivityType;
+  status: ActivityStatus;
   durationMin: number;
   distanceKm: number | null;
   notes: string | null;

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Maneuver tracks movement-based activity (exercise, commuting, hiking, etc.) per day/week/month/year. Stack: Next.js (App Router, TypeScript) + Supabase (email/password auth, Postgres with RLS). Styling is intentionally minimal and deferred. Planned but not built: activity add/edit/delete form and a chatbot agent for activity recommendations/logging.
+Maneuver tracks movement-based activity (exercise, commuting, hiking, etc.) per day/week/month/year. Stack: Next.js (App Router, TypeScript) + Supabase (email/password auth, Postgres with RLS). Styling is intentionally minimal and deferred. Planned but not built: a chatbot agent for activity recommendations/logging.
 
 ## Rules for this session setup
 
@@ -35,7 +35,8 @@ There is no test runner configured yet.
 1. `types.ts` — `Activity` is the camelCase form of a `public.activities` row (id, date, type, durationMin, distanceKm, notes); `ACTIVITY_TYPES`, `TIMESCALES`, `METRICS` are the source-of-truth const arrays. `ACTIVITY_TYPES` must match the CHECK constraint in the migration.
 2. `data.ts` → `getActivities({from, to})` is the **single seam** that queries Supabase (rows mapped snake_case → `Activity`); `hasAnyActivity()` drives the empty-account state. RLS scopes everything to the signed-in user. PostgREST caps responses at 1000 rows.
    The write path (`getActivity`, `createActivity`, `updateActivity`, `deleteActivity`) also lives in `data.ts`; update/delete throw `ActivityNotFoundError` when zero rows match (missing or hidden by RLS). Keep these as plain functions, not form-coupled, so other callers (e.g. a future chatbot tool) can reuse them.
-   - Logging flow: `/activity/new` and `/activity/[id]/edit` render `ActivityForm` (client, `useActionState`) → server actions in `src/app/activity/actions.ts` → `parseActivityInput` (`src/lib/activity-input.ts`, the single place input rules live; future dates are rejected) → `data.ts`. Edit/Delete controls are on the day view of `/activity`.
+   - Planned workouts: `activities.status` is `planned` | `completed` (`ACTIVITY_STATUSES`, migration `0003`; default `completed`). `getActivities` takes `status` and **defaults to `"completed"`** so charts/summaries never include plans; `/activity` passes `"all"` and renders plans in `PlannedList`. Date rules in `parseActivityInput(raw, today, status)`: completed ≤ today, planned ≥ today. `completeActivity` ("Mark done") keeps the date unless it's in the future, then uses today. `resolvePeriod(..., { allowFuture: true })` lets `/activity` navigate forward; `/charts` doesn't.
+   - Logging flow: `/activity/new` and `/activity/[id]/edit` render `ActivityForm` (client, `useActionState`) → server actions in `src/app/activity/actions.ts` → `parseActivityInput` (`src/lib/activity-input.ts`, the single place input rules live; future dates are rejected) → `data.ts`. Edit/Delete controls are on the day view of `/activity`. Planning uses `/activity/plan` (same `ActivityForm`, `createPlannedActivityAction`); `updateActivityAction` gets the status bound by the edit page.
 3. `mock-data.ts` — deterministic generator (~400 days ending today, seeded **per date**); now only used by the `loadSampleData` server action (`src/app/activity/actions.ts`) to give an empty account demo data.
 4. `period.ts` — `resolvePeriod(scale, anchor, today)` → start/end/label/prev/next (weeks start Monday, uses `date-fns`).
 5. `aggregate.ts` — `bucketActivities` (day → one bucket per activity; week/month → daily buckets; year → monthly buckets; empty buckets included as zeros), `summarize`, `totalsByType`.

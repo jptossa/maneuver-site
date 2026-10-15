@@ -95,6 +95,7 @@ function generate(today: Date): Activity[] {
         id: `mock-${iso}-${n}`,
         date: iso,
         type,
+        status: "completed",
         durationMin: Math.max(10, durationMin),
         distanceKm,
       });

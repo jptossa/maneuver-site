@@ -1,5 +1,10 @@
 import { format, isValid, parseISO } from "date-fns";
-import { ACTIVITY_TYPES, type ActivityInput, type ActivityType } from "./types";
+import {
+  ACTIVITY_TYPES,
+  type ActivityInput,
+  type ActivityStatus,
+  type ActivityType,
+} from "./types";
 
 export const FIELDS = [
   "date",
@@ -39,16 +44,26 @@ export function formDataToRaw(formData: FormData): RawInput {
   return raw;
 }
 
-/** Validates user-supplied activity fields. Dates may not be after `today`. */
-export function parseActivityInput(raw: RawInput, today: Date): ParseResult {
+/**
+ * Validates user-supplied activity fields. `status` comes from the caller, not
+ * the form: completed dates may not be after `today`, planned dates may not be before it.
+ */
+export function parseActivityInput(
+  raw: RawInput,
+  today: Date,
+  status: ActivityStatus,
+): ParseResult {
   const errors: FieldErrors = {};
 
   const date = (raw.date ?? "").trim();
+  const todayIso = format(today, "yyyy-MM-dd");
   const parsed = /^\d{4}-\d{2}-\d{2}$/.test(date) ? parseISO(date) : null;
   if (!parsed || !isValid(parsed) || format(parsed, "yyyy-MM-dd") !== date) {
     errors.date = "Enter a valid date.";
-  } else if (date > format(today, "yyyy-MM-dd")) {
+  } else if (status === "completed" && date > todayIso) {
     errors.date = "Date can't be in the future.";
+  } else if (status === "planned" && date < todayIso) {
+    errors.date = "Planned date can't be in the past.";
   }
 
   const type = (raw.type ?? "").trim();
@@ -85,6 +100,7 @@ export function parseActivityInput(raw: RawInput, today: Date): ParseResult {
     value: {
       date,
       type: type as ActivityType,
+      status,
       durationMin,
       distanceKm,
       notes: notes === "" ? null : notes,
