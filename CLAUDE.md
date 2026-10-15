@@ -43,6 +43,11 @@ There is no test runner configured yet.
 
 Pages (`/` landing, `/activity` tracker table, `/charts` graphs) are thin: resolve period → `getActivities` → aggregate → render shared components in `src/components/`.
 
+**Activity assistant (chatbot)**: `/assistant` page (`ChatWidget`, client) → `POST /api/chat` (`src/app/api/chat/route.ts`) → `runAgent` (`src/lib/chatbot/agent.ts`), a manual tool loop on the Anthropic Messages API (`@anthropic-ai/sdk`, non-streaming, model `CHATBOT_MODEL` defaulting to `claude-haiku-5-5`, `effort: "low"`).
+- Everything tunable is in `src/lib/chatbot/config.ts` (model, the fictional escalation rep "Sifu Sensei" + phone, limits). Persona/scope/escalation rules are the system prompt in `prompt.ts`, built per request (it embeds today's date).
+- Logged-out visitors get no tools (suggestions only). Signed-in users (checked with `auth.getClaims()` in the route) get `get_activity_history`, `log_activity`, `plan_activity` from `tools.ts`; writes go through `parseActivityInput` + `createActivity` — the same rules and data seam as the forms. The assistant cannot edit/delete.
+- The client keeps only plain-text turns and resends them each request; tool calls/thinking blocks never leave `runAgent`. `ANTHROPIC_API_KEY` is server-only; without it the route answers 503. Rate limiting (`rate-limit.ts`) is in-memory best-effort; the Anthropic console spend limit is the real backstop.
+
 **Supabase / auth**:
 - Schema lives in `supabase/migrations/*.sql` and is applied manually in the Supabase SQL editor (no CLI project). `user_id` defaults to `auth.uid()`, so inserts never send it. New tables need an explicit `grant … to authenticated` (see `0002_activities_grants.sql`) in addition to RLS policies, or queries fail with "permission denied for table".
 - `src/lib/supabase/server.ts` `createClient()` is the per-request client (cookie-bound, so it must run inside a `<Suspense>` boundary under Cache Components). Env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (names in `.env.example`; values go in `.env.local`, which must not be read). No service-role key is used anywhere.

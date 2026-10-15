@@ -31,8 +31,9 @@ const services = [
     href: "/charts",
   },
   {
-    title: "Activity assistant (coming soon)",
-    body: "Chat with an assistant that suggests activities you might enjoy. With an account it can also learn from your history and help you log what you did.",
+    title: "Activity assistant",
+    body: "Chat with an assistant that suggests activities you might enjoy. With an account it can also learn from your history and help you log or plan what you do.",
+    href: "/assistant",
   },
 ];
 
