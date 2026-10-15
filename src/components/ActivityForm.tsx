@@ -7,11 +7,7 @@ import type {
   Field,
   RawInput,
 } from "@/lib/activity-input";
-import { ACTIVITY_TYPES } from "@/lib/types";
-
-function capitalize(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
+import { activityLabel, typesByGroup } from "@/lib/activity-catalog";
 
 export default function ActivityForm({
   action,
@@ -80,10 +76,14 @@ export default function ActivityForm({
             <option value="" disabled>
               Choose…
             </option>
-            {ACTIVITY_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {capitalize(t)}
-              </option>
+            {typesByGroup().map(({ group, types }) => (
+              <optgroup key={group} label={group}>
+                {types.map((t) => (
+                  <option key={t} value={t}>
+                    {activityLabel(t)}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>

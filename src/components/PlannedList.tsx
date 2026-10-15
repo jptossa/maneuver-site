@@ -4,7 +4,8 @@ import {
   deleteActivityAction,
 } from "@/app/activity/actions";
 import DeleteActivityButton from "@/components/DeleteActivityButton";
-import { capitalize, formatDuration } from "@/lib/aggregate";
+import { activityLabel } from "@/lib/activity-catalog";
+import { formatDuration } from "@/lib/aggregate";
 import type { Activity } from "@/lib/types";
 
 /** Planned workouts in the viewed period. Renders nothing when there are none. */
@@ -41,7 +42,7 @@ export default function PlannedList({
                 {a.date}
                 {a.date < todayIso && " (overdue)"}
               </td>
-              <td>{capitalize(a.type)}</td>
+              <td>{activityLabel(a.type)}</td>
               <td>{formatDuration(a.durationMin)}</td>
               <td>{a.distanceKm === null ? "—" : `${a.distanceKm} km`}</td>
               <td>{a.notes ?? ""}</td>
