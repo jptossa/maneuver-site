@@ -16,6 +16,7 @@ function capitalize(s: string) {
 export default function ActivityForm({
   action,
   initial,
+  minDate,
   maxDate,
   cancelHref,
   submitLabel,
@@ -25,8 +26,10 @@ export default function ActivityForm({
     formData: FormData,
   ) => Promise<ActivityFormState>;
   initial: RawInput;
-  /** Latest selectable date (today), yyyy-MM-dd */
-  maxDate: string;
+  /** Earliest selectable date (today, for planned workouts), yyyy-MM-dd */
+  minDate?: string;
+  /** Latest selectable date (today, for completed activities), yyyy-MM-dd */
+  maxDate?: string;
   cancelHref: string;
   submitLabel: string;
 }) {
@@ -55,6 +58,7 @@ export default function ActivityForm({
             type="date"
             name="date"
             required
+            min={minDate}
             max={maxDate}
             defaultValue={values.date ?? ""}
             aria-invalid={!!errors.date}

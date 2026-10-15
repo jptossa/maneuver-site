@@ -1,5 +1,6 @@
 "use server";
 
+import { format } from "date-fns";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
@@ -9,6 +10,7 @@ import {
 } from "@/lib/activity-input";
 import {
   ActivityNotFoundError,
+  completeActivity,
   createActivity,
   deleteActivity,
   updateActivity,
@@ -16,6 +18,7 @@ import {
 import { buildHref } from "@/lib/href";
 import { getMockActivities } from "@/lib/mock-data";
 import { createClient } from "@/lib/supabase/server";
+import type { ActivityStatus } from "@/lib/types";
 
 const BATCH_SIZE = 500;
 
@@ -36,28 +39,45 @@ function dayHref(date: string) {
   return buildHref("/activity", { scale: "day", date });
 }
 
-export async function createActivityAction(
-  _prev: ActivityFormState,
+async function create(
+  status: ActivityStatus,
+  formPath: string,
   formData: FormData,
 ): Promise<ActivityFormState> {
   const raw = formDataToRaw(formData);
-  const result = parseActivityInput(raw, new Date());
+  const result = parseActivityInput(raw, new Date(), status);
   if (!result.ok) return { errors: result.errors, values: raw };
 
-  await requireUser("/activity/new");
+  await requireUser(formPath);
   await createActivity(result.value);
 
   revalidateActivity();
   redirect(dayHref(result.value.date));
 }
 
+export async function createActivityAction(
+  _prev: ActivityFormState,
+  formData: FormData,
+): Promise<ActivityFormState> {
+  return create("completed", "/activity/new", formData);
+}
+
+export async function createPlannedActivityAction(
+  _prev: ActivityFormState,
+  formData: FormData,
+): Promise<ActivityFormState> {
+  return create("planned", "/activity/plan", formData);
+}
+
+/** `status` is bound by the edit page and decides which date rule applies. */
 export async function updateActivityAction(
   id: string,
+  status: ActivityStatus,
   _prev: ActivityFormState,
   formData: FormData,
 ): Promise<ActivityFormState> {
   const raw = formDataToRaw(formData);
-  const result = parseActivityInput(raw, new Date());
+  const result = parseActivityInput(raw, new Date(), status);
   if (!result.ok) return { errors: result.errors, values: raw };
 
   await requireUser(`/activity/${id}/edit`);
@@ -78,6 +98,28 @@ export async function updateActivityAction(
   redirect(dayHref(result.value.date));
 }
 
+/** Marks a planned workout as done, then shows the day it ended up on. */
+export async function completeActivityAction(id: string, formData: FormData) {
+  await requireUser("/activity");
+  let date: string | null = null;
+  try {
+    date = await completeActivity(id, format(new Date(), "yyyy-MM-dd"));
+  } catch (e) {
+    // Already completed, deleted, or not theirs: nothing left to do.
+    if (!(e instanceof ActivityNotFoundError)) throw e;
+  }
+
+  revalidateActivity();
+  redirect(date ? dayHref(date) : returnHref(formData));
+}
+
+function returnHref(formData: FormData) {
+  const date = formData.get("date");
+  return typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
+    ? dayHref(date)
+    : "/activity";
+}
+
 /** `date` (hidden form field) is only used to return to the right day view. */
 export async function deleteActivityAction(id: string, formData: FormData) {
   await requireUser("/activity");
@@ -89,12 +131,7 @@ export async function deleteActivityAction(id: string, formData: FormData) {
   }
 
   revalidateActivity();
-  const date = formData.get("date");
-  redirect(
-    typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
-      ? dayHref(date)
-      : "/activity",
-  );
+  redirect(returnHref(formData));
 }
 
 /**
@@ -108,6 +145,7 @@ export async function loadSampleData() {
   const rows = getMockActivities().map((a) => ({
     date: a.date,
     type: a.type,
+    status: "completed",
     duration_min: a.durationMin,
     distance_km: a.distanceKm,
   }));

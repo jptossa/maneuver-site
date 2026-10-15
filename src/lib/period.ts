@@ -51,6 +51,8 @@ export function resolvePeriod(
   scale: Timescale,
   anchor: Date,
   today: Date,
+  /** `allowFuture`: let the user navigate past today (for planned workouts). */
+  { allowFuture = false }: { allowFuture?: boolean } = {},
 ): Period {
   let start: Date, end: Date, prev: Date, next: Date, label: string;
   switch (scale) {
@@ -94,6 +96,6 @@ export function resolvePeriod(
     prevDate: format(prev, ISO),
     nextDate: format(next, ISO),
     isCurrent: startIso <= todayIso && todayIso <= endIso,
-    hasNext: endIso < todayIso,
+    hasNext: allowFuture || endIso < todayIso,
   };
 }

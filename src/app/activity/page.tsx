@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import ActivityList from "@/components/ActivityList";
 import PeriodNav from "@/components/PeriodNav";
+import PlannedList from "@/components/PlannedList";
 import SummaryCards from "@/components/SummaryCards";
 import TimescaleTabs from "@/components/TimescaleTabs";
 import { bucketActivities, summarize } from "@/lib/aggregate";
@@ -20,24 +21,35 @@ async function ActivityView({ searchParams }: PageProps<"/activity">) {
   await connection(); // "today" is request-time data
   const today = new Date();
   const scale = parseScale(sp.scale);
-  const period = resolvePeriod(scale, parseDate(sp.date, today), today);
-  const activities = await getActivities({
+  const period = resolvePeriod(scale, parseDate(sp.date, today), today, {
+    allowFuture: true,
+  });
+  const all = await getActivities({
     from: period.start,
     to: period.end,
+    status: "all",
   });
+  // Planned workouts are listed separately and never counted in stats.
+  const activities = all.filter((a) => a.status === "completed");
+  const planned = all.filter((a) => a.status === "planned");
   const buckets = bucketActivities(activities, period, "minutes");
   // Only offer sample data to accounts with no history at all, not for every empty period.
-  const showSampleData = activities.length === 0 && !(await hasAnyActivity());
+  const showSampleData = all.length === 0 && !(await hasAnyActivity());
 
-  // Prefill the "Log activity" form with the viewed day, but never a future date.
+  // Prefill "Log activity" with the viewed day (never a future date) and
+  // "Plan workout" with it (never a past date).
   const todayIso = format(today, "yyyy-MM-dd");
   const logDate = period.date > todayIso ? todayIso : period.date;
+  const planDate = period.date < todayIso ? todayIso : period.date;
 
   return (
     <>
       <p>
         <Link href={buildHref("/activity/new", { date: logDate })}>
           Log activity
+        </Link>{" "}
+        <Link href={buildHref("/activity/plan", { date: planDate })}>
+          Plan workout
         </Link>
       </p>
       <TimescaleTabs path="/activity" scale={scale} date={period.date} />
@@ -48,6 +60,7 @@ async function ActivityView({ searchParams }: PageProps<"/activity">) {
         activities={activities}
         buckets={buckets}
       />
+      <PlannedList planned={planned} todayIso={todayIso} />
       {showSampleData && (
         <form action={loadSampleData}>
           <p>

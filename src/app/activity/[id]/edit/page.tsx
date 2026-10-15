@@ -21,21 +21,31 @@ async function EditActivityForm({ params }: PageProps<"/activity/[id]/edit">) {
   const activity = await getActivity(id);
   if (!activity) notFound();
 
+  const todayIso = format(new Date(), "yyyy-MM-dd");
+  const planned = activity.status === "planned";
+
   return (
-    <ActivityForm
-      action={updateActivityAction.bind(null, id)}
-      initial={{
-        date: activity.date,
-        type: activity.type,
-        durationMin: String(activity.durationMin),
-        distanceKm:
-          activity.distanceKm === null ? "" : String(activity.distanceKm),
-        notes: activity.notes ?? "",
-      }}
-      maxDate={format(new Date(), "yyyy-MM-dd")}
-      cancelHref={buildHref("/activity", { scale: "day", date: activity.date })}
-      submitLabel="Save changes"
-    />
+    <>
+      <h1>{planned ? "Edit planned workout" : "Edit activity"}</h1>
+      <ActivityForm
+        action={updateActivityAction.bind(null, id, activity.status)}
+        initial={{
+          date: activity.date,
+          type: activity.type,
+          durationMin: String(activity.durationMin),
+          distanceKm:
+            activity.distanceKm === null ? "" : String(activity.distanceKm),
+          notes: activity.notes ?? "",
+        }}
+        minDate={planned ? todayIso : undefined}
+        maxDate={planned ? undefined : todayIso}
+        cancelHref={buildHref("/activity", {
+          scale: "day",
+          date: activity.date,
+        })}
+        submitLabel="Save changes"
+      />
+    </>
   );
 }
 
@@ -43,11 +53,8 @@ export default function EditActivityPage(
   props: PageProps<"/activity/[id]/edit">,
 ) {
   return (
-    <>
-      <h1>Edit activity</h1>
-      <Suspense fallback={<p>Loading…</p>}>
-        <EditActivityForm {...props} />
-      </Suspense>
-    </>
+    <Suspense fallback={<h1>Edit activity</h1>}>
+      <EditActivityForm {...props} />
+    </Suspense>
   );
 }
