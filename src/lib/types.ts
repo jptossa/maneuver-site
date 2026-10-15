@@ -1,15 +1,9 @@
-// Keep in sync with the CHECK constraint in supabase/migrations/0001_activities.sql.
-export const ACTIVITY_TYPES = [
-  "walking",
-  "running",
-  "cycling",
-  "hiking",
-  "swimming",
-  "commuting",
-  "strength",
-  "yoga",
-] as const;
-export type ActivityType = (typeof ACTIVITY_TYPES)[number];
+import { ACTIVITY_CATALOG, type CatalogType } from "./activity-catalog";
+
+// Derived from ACTIVITY_CATALOG; keep the CHECK constraint in supabase/migrations in sync
+// (latest: 0004_activity_types_expand.sql).
+export const ACTIVITY_TYPES = Object.keys(ACTIVITY_CATALOG) as ActivityType[];
+export type ActivityType = CatalogType;
 
 // Keep in sync with the CHECK constraint in supabase/migrations/0003_activities_status.sql.
 export const ACTIVITY_STATUSES = ["planned", "completed"] as const;

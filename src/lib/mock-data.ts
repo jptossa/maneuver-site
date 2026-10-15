@@ -22,7 +22,20 @@ interface TypeSpec {
   speed: [number, number] | null;
 }
 
-const SPECS: Record<ActivityType, TypeSpec> = {
+// Sample data only covers the original core types, not the full catalog.
+type MockType = Extract<
+  ActivityType,
+  | "walking"
+  | "running"
+  | "cycling"
+  | "hiking"
+  | "swimming"
+  | "commuting"
+  | "strength"
+  | "yoga"
+>;
+
+const SPECS: Record<MockType, TypeSpec> = {
   walking: { minDur: 20, maxDur: 75, speed: [4, 5.5] },
   running: { minDur: 20, maxDur: 70, speed: [8, 12] },
   cycling: { minDur: 30, maxDur: 120, speed: [15, 25] },
@@ -33,7 +46,7 @@ const SPECS: Record<ActivityType, TypeSpec> = {
   yoga: { minDur: 20, maxDur: 60, speed: null },
 };
 
-const WEEKDAY_POOL: ActivityType[] = [
+const WEEKDAY_POOL: MockType[] = [
   "commuting",
   "commuting",
   "commuting",
@@ -44,7 +57,7 @@ const WEEKDAY_POOL: ActivityType[] = [
   "cycling",
   "swimming",
 ];
-const WEEKEND_POOL: ActivityType[] = [
+const WEEKEND_POOL: MockType[] = [
   "hiking",
   "hiking",
   "cycling",
@@ -74,7 +87,7 @@ function generate(today: Date): Activity[] {
 
     const count = rand() < 0.35 * season ? 2 : rand() < 0.06 ? 3 : 1;
     const pool = weekend ? WEEKEND_POOL : WEEKDAY_POOL;
-    const used = new Set<ActivityType>();
+    const used = new Set<MockType>();
     for (let n = 0; n < count; n++) {
       const type = pool[Math.floor(rand() * pool.length)];
       if (used.has(type)) continue;

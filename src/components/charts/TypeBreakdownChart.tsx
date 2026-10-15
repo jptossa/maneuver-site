@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
+import { activityLabel } from "@/lib/activity-catalog";
 import { TYPE_COLORS } from "@/lib/chart-colors";
 import type { ActivityType } from "@/lib/types";
 
@@ -21,9 +22,9 @@ export default function TypeBreakdownChart({
       <ResponsiveContainer>
         <PieChart>
           <Pie
-            data={data}
+            data={data.map((d) => ({ ...d, name: activityLabel(d.type) }))}
             dataKey="value"
-            nameKey="type"
+            nameKey="name"
             innerRadius="55%"
             outerRadius="80%"
           >

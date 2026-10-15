@@ -2,7 +2,8 @@ import Link from "next/link";
 import { deleteActivityAction } from "@/app/activity/actions";
 import DeleteActivityButton from "@/components/DeleteActivityButton";
 import { buildHref } from "@/lib/href";
-import { capitalize, formatDuration } from "@/lib/aggregate";
+import { activityLabel } from "@/lib/activity-catalog";
+import { formatDuration } from "@/lib/aggregate";
 import type { Activity, Bucket, Period } from "@/lib/types";
 
 /**
@@ -39,7 +40,7 @@ export default function ActivityList({
         <tbody>
           {activities.map((a) => (
             <tr key={a.id}>
-              <td>{capitalize(a.type)}</td>
+              <td>{activityLabel(a.type)}</td>
               <td>{formatDuration(a.durationMin)}</td>
               <td>{a.distanceKm === null ? "—" : `${a.distanceKm} km`}</td>
               <td>{a.notes ?? ""}</td>

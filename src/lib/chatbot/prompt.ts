@@ -1,4 +1,5 @@
 import { addDays, format } from "date-fns";
+import { activityLabel } from "@/lib/activity-catalog";
 import { ACTIVITY_TYPES } from "@/lib/types";
 import { REPRESENTATIVE } from "./config";
 
@@ -17,7 +18,8 @@ export function buildSystemPrompt(opts: {
   const calendar = [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7]
     .map((n) => format(addDays(opts.today, n), "EEE yyyy-MM-dd"))
     .join(", ");
-  const types = ACTIVITY_TYPES.join(", ");
+  // slug (Label) so the model picks the exact slug the tools accept.
+  const types = ACTIVITY_TYPES.map((t) => `${t} (${activityLabel(t)})`).join(", ");
   const rep = `${REPRESENTATIVE.name}, ${REPRESENTATIVE.title}, based on ${REPRESENTATIVE.base}, phone ${REPRESENTATIVE.phone}`;
 
   const common = `You are the Maneuver assistant. Maneuver is a site for tracking movement-based activity (exercise, commuting, hiking and so on) by day, week, month and year. Today is ${today}. Calendar around today (day before yesterday through next week): ${calendar}. Take weekdays and dates from this calendar or from data you are given; never work out a weekday yourself.

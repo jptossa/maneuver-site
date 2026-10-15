@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { activityLabel } from "@/lib/activity-catalog";
 import { TYPE_COLORS } from "@/lib/chart-colors";
 import { ACTIVITY_TYPES, type ActivityType } from "@/lib/types";
 
@@ -34,7 +35,13 @@ export default function ActivityBarChart({
           <Tooltip />
           <Legend />
           {types.map((t) => (
-            <Bar key={t} dataKey={t} stackId="a" fill={TYPE_COLORS[t]} />
+            <Bar
+              key={t}
+              dataKey={t}
+              name={activityLabel(t)}
+              stackId="a"
+              fill={TYPE_COLORS[t]}
+            />
           ))}
         </BarChart>
       </ResponsiveContainer>

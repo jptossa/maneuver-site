@@ -4,6 +4,7 @@ import {
   format,
   parseISO,
 } from "date-fns";
+import { activityLabel } from "./activity-catalog";
 import {
   ACTIVITY_TYPES,
   type Activity,
@@ -81,7 +82,7 @@ export function bucketActivities(
 
   if (period.scale === "day") {
     return activities.map((a) =>
-      makeBucket(a.id, capitalize(a.type), a.date, a.date, [a], metric),
+      makeBucket(a.id, activityLabel(a.type), a.date, a.date, [a], metric),
     );
   }
 
