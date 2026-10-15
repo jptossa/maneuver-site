@@ -12,7 +12,11 @@ export type ActivityStatus = (typeof ACTIVITY_STATUSES)[number];
 export const TIMESCALES =["day", "week", "month", "year"] as const;
 export type Timescale = (typeof TIMESCALES)[number];
 
-export const METRICS = ["minutes", "distance", "sessions"] as const;
+/** How /charts series are grouped: one per activity type, or rolled up to its group. */
+export const GROUPINGS = ["type", "group"] as const;
+export type Grouping = (typeof GROUPINGS)[number];
+
+export const METRICS =["minutes", "distance", "sessions"] as const;
 export type Metric = (typeof METRICS)[number];
 
 /** Mirrors a future Supabase `activities` row (minus user_id). */

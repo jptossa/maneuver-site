@@ -4,7 +4,12 @@ import {
   format,
   parseISO,
 } from "date-fns";
-import { activityLabel } from "./activity-catalog";
+import {
+  ACTIVITY_CATALOG,
+  ACTIVITY_GROUPS,
+  activityLabel,
+  type ActivityGroup,
+} from "./activity-catalog";
 import {
   ACTIVITY_TYPES,
   type Activity,
@@ -128,6 +133,35 @@ export function totalsByType(
   }
   return ACTIVITY_TYPES.map((type) => ({ type, value: byType[type] })).filter(
     (t) => t.value > 0,
+  );
+}
+
+/** Sums a per-type breakdown into one value per activity group. */
+export function rollUpByGroup(
+  byType: Record<ActivityType, number>,
+): Record<ActivityGroup, number> {
+  const out = Object.fromEntries(ACTIVITY_GROUPS.map((g) => [g, 0])) as Record<
+    ActivityGroup,
+    number
+  >;
+  for (const t of ACTIVITY_TYPES) {
+    const g = ACTIVITY_CATALOG[t].group;
+    out[g] = round1(out[g] + byType[t]);
+  }
+  return out;
+}
+
+export function totalsByGroup(
+  activities: Activity[],
+  metric: Metric,
+): { group: ActivityGroup; value: number }[] {
+  const byType = emptyByType();
+  for (const a of activities) {
+    byType[a.type] = round1(byType[a.type] + metricValue(a, metric));
+  }
+  const byGroup = rollUpByGroup(byType);
+  return ACTIVITY_GROUPS.map((group) => ({ group, value: byGroup[group] })).filter(
+    (g) => g.value > 0,
   );
 }
 

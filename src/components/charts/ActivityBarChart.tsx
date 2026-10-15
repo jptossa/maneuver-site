@@ -10,21 +10,22 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { activityLabel } from "@/lib/activity-catalog";
-import { TYPE_COLORS } from "@/lib/chart-colors";
-import { ACTIVITY_TYPES, type ActivityType } from "@/lib/types";
+import type { ChartSeries } from "@/lib/chart-colors";
 
-export type BarRow = { label: string } & Record<ActivityType, number>;
+/** One bar: its x-axis label plus a value per series key. */
+export type BarRow = { label: string } & Record<string, number | string>;
 
 export default function ActivityBarChart({
   data,
+  series,
   unit,
 }: {
   data: BarRow[];
+  series: ChartSeries[];
   unit: string;
 }) {
   // Only render series that actually have data in this period.
-  const types = ACTIVITY_TYPES.filter((t) => data.some((r) => r[t] > 0));
+  const active = series.filter((s) => data.some((r) => Number(r[s.key]) > 0));
   return (
     <div style={{ width: "100%", height: 360 }}>
       <ResponsiveContainer>
@@ -34,13 +35,13 @@ export default function ActivityBarChart({
           <YAxis unit={unit ? ` ${unit}` : undefined} width={70} />
           <Tooltip />
           <Legend />
-          {types.map((t) => (
+          {active.map((s) => (
             <Bar
-              key={t}
-              dataKey={t}
-              name={activityLabel(t)}
+              key={s.key}
+              dataKey={s.key}
+              name={s.label}
               stackId="a"
-              fill={TYPE_COLORS[t]}
+              fill={s.color}
             />
           ))}
         </BarChart>

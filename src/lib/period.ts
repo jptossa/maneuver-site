@@ -14,8 +14,10 @@ import {
   startOfYear,
 } from "date-fns";
 import {
+  GROUPINGS,
   METRICS,
   TIMESCALES,
+  type Grouping,
   type Metric,
   type Period,
   type Timescale,
@@ -32,6 +34,11 @@ export function parseScale(value: string | string[] | undefined): Timescale {
 export function parseMetric(value: string | string[] | undefined): Metric {
   const v = Array.isArray(value) ? value[0] : value;
   return METRICS.find((m) => m === v) ?? "minutes";
+}
+
+export function parseGrouping(value: string | string[] | undefined): Grouping {
+  const v = Array.isArray(value) ? value[0] : value;
+  return GROUPINGS.find((g) => g === v) ?? "type";
 }
 
 /** Invalid or missing input falls back to `today`. */
