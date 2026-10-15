@@ -1,49 +1,61 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-html {
-  height: 100%;
-}
-
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
+/* Minimal structural styles only — real styling comes in a later step. */
 * {
   box-sizing: border-box;
-  padding: 0;
+}
+
+body {
   margin: 0;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+header,
+main,
+footer {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+nav ul {
+  display: flex;
+  gap: 16px;
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+
+header nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid #ddd;
+}
+
+dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+dt {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+dd {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
 }

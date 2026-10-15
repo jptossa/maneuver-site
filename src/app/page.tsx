@@ -1,69 +1,81 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Link from "next/link";
+
+const benefits = [
+  {
+    title: "Every kind of movement counts",
+    body: "Workouts, bike commutes, weekend hikes, walks to the shop — Maneuver captures all of it, not just gym sessions.",
+  },
+  {
+    title: "See the bigger picture",
+    body: "Look at your activity by day, week, month or year to spot patterns and trends instead of guessing.",
+  },
+  {
+    title: "Stay motivated",
+    body: "Clear totals and charts make progress visible, so it is easier to keep a habit going.",
+  },
+  {
+    title: "One place for everything",
+    body: "Stop juggling apps and notebooks. Keep your whole movement history together.",
+  },
+];
+
+const services = [
+  {
+    title: "Activity tracking",
+    body: "Log activities and review them across daily, weekly, monthly and yearly views.",
+    href: "/activity",
+  },
+  {
+    title: "Charts & insights",
+    body: "Graph your time, distance and sessions, and see how your activity types stack up.",
+    href: "/charts",
+  },
+  {
+    title: "Activity assistant (coming soon)",
+    body: "Chat with an assistant that suggests activities you might enjoy. With an account it can also learn from your history and help you log what you did.",
+  },
+];
 
 export default function Home() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <>
+      <section>
+        <h1>Move more. Notice more.</h1>
+        <p>
+          Our mission is to make everyday movement visible and rewarding, so
+          anyone can build a more active life — one maneuver at a time.
+        </p>
+        <p>
+          <Link href="/signup">Sign up free</Link>{" "}
+          <Link href="/login">Log in</Link>{" "}
+          <Link href="/activity">View my activity</Link>{" "}
+          <Link href="/charts">See the charts</Link>
+        </p>
+      </section>
+
+      <section>
+        <h2>Why Maneuver</h2>
+        <ul>
+          {benefits.map((b) => (
+            <li key={b.title}>
+              <h3>{b.title}</h3>
+              <p>{b.body}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section>
+        <h2>What we offer</h2>
+        <ul>
+          {services.map((s) => (
+            <li key={s.title}>
+              <h3>{s.href ? <Link href={s.href}>{s.title}</Link> : s.title}</h3>
+              <p>{s.body}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
   );
 }
