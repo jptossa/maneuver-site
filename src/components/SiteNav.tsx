@@ -17,6 +17,9 @@ export default function SiteNav() {
             <Link href="/charts">Charts</Link>
           </li>
           <li>
+            <Link href="/assistant">Assistant</Link>
+          </li>
+          <li>
             {/* Reads the session cookie, so it must stream behind Suspense (Cache Components). */}
             <Suspense fallback={null}>
               <AuthStatus />
