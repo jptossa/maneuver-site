@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { safeNext } from "@/lib/auth";
+import { geocodeUs } from "@/lib/geocode";
+import type { HomeLocation } from "@/lib/location";
 import { createClient } from "@/lib/supabase/server";
 import { displayToKgWeight, parseUnits, weightUnit } from "@/lib/units";
 
@@ -88,6 +90,39 @@ export async function setWeight(formData: FormData) {
   await supabase.auth.refreshSession(); // claims are read from the JWT; see setUnits
 
   revalidatePath("/", "layout");
+}
+
+export interface LocationFormState {
+  error?: string;
+  saved?: string;
+}
+
+/**
+ * Saves the home location (`user_metadata.homeLocation`) from a typed US city or ZIP,
+ * geocoded once here. Only the rounded coordinates and a label are stored. The
+ * "clear" button removes it.
+ */
+export async function setLocation(
+  _prev: LocationFormState,
+  formData: FormData,
+): Promise<LocationFormState> {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  if (!data?.claims) redirect("/login");
+
+  let homeLocation: HomeLocation | null = null;
+  if (formData.get("intent") !== "clear") {
+    const result = await geocodeUs(field(formData, "place"));
+    if (!result.ok) return { error: result.error };
+    homeLocation = result.location;
+  }
+
+  const { error } = await supabase.auth.updateUser({ data: { homeLocation } });
+  if (error) return { error: "Couldn't save your location. Try again." };
+  await supabase.auth.refreshSession(); // claims are read from the JWT; see setUnits
+
+  revalidatePath("/", "layout");
+  return homeLocation ? { saved: homeLocation.label } : {};
 }
 
 export async function signout() {

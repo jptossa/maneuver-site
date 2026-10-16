@@ -46,7 +46,7 @@ interface Outcome {
 }
 
 async function runCase(c: Case): Promise<Outcome> {
-  const store = new MemoryStore(seedFor(c));
+  const store = new MemoryStore(seedFor(c), c.outdoors);
   const before = store.snapshot();
   const history: ChatTurn[] = [];
   const replies: string[] = [];
@@ -72,6 +72,7 @@ async function runCase(c: Case): Promise<Outcome> {
         env: store.env(),
         units: c.units ?? "us",
         weightKg: c.weightKg ?? null,
+        location: c.location ?? null,
         claimSonnet,
         today: TODAY,
       });
@@ -97,6 +98,8 @@ async function runCase(c: Case): Promise<Outcome> {
       replies,
       escalated,
       claimAttempts,
+      providerCalls: store.calls,
+      trailQueries: store.trailQueries,
       before,
       after: store.snapshot(),
     }),
