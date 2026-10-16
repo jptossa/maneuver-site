@@ -4,6 +4,7 @@ import DeleteActivityButton from "@/components/DeleteActivityButton";
 import { buildHref } from "@/lib/href";
 import { activityLabel } from "@/lib/activity-catalog";
 import { formatDuration } from "@/lib/aggregate";
+import { estimateCalories, formatCalories } from "@/lib/calories";
 import type { Activity, Bucket, Period } from "@/lib/types";
 import { formatDistance, type UnitSystem } from "@/lib/units";
 
@@ -16,11 +17,14 @@ export default function ActivityList({
   activities,
   buckets,
   units,
+  weightKg,
 }: {
   period: Period;
   activities: Activity[];
   buckets: Bucket[];
   units: UnitSystem;
+  /** For calorie estimates in the day view; null when the user hasn't set it. */
+  weightKg: number | null;
 }) {
   if (activities.length === 0) {
     return <p>No activity recorded for this period.</p>;
@@ -34,6 +38,7 @@ export default function ActivityList({
             <th>Activity</th>
             <th>Duration</th>
             <th>Distance</th>
+            <th>Calories (est.)</th>
             <th>Notes</th>
             <th>
               <span hidden>Actions</span>
@@ -41,7 +46,9 @@ export default function ActivityList({
           </tr>
         </thead>
         <tbody>
-          {activities.map((a) => (
+          {activities.map((a) => {
+            const kcal = estimateCalories(a, weightKg);
+            return (
             <tr key={a.id}>
               <td>{activityLabel(a.type)}</td>
               <td>{formatDuration(a.durationMin)}</td>
@@ -50,6 +57,7 @@ export default function ActivityList({
                   ? "—"
                   : formatDistance(a.distanceKm, units)}
               </td>
+              <td>{kcal === null ? "—" : formatCalories(kcal)}</td>
               <td>{a.notes ?? ""}</td>
               <td>
                 <Link href={`/activity/${a.id}/edit`}>Edit</Link>
@@ -59,7 +67,8 @@ export default function ActivityList({
                 />
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     );

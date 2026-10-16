@@ -1,0 +1,21 @@
+{
+  "source": "CDC, Adult Activity: An Overview",
+  "sourceUrl": "https://www.cdc.gov/physical-activity-basics/guidelines/adults.html",
+  "retrievedAt": "2026-10-16",
+  "targets": {
+    "moderateMinutes": 150,
+    "vigorousMinutes": 75,
+    "muscleStrengtheningDays": 2
+  },
+  "keyPoints": [
+    "Physical activity is one of the most important things you can do for your health.",
+    "Adults need at least 150 minutes of moderate-intensity physical activity a week, such as 30 minutes a day, 5 days a week.",
+    "Adults also need 2 days of muscle-strengthening activity each week."
+  ],
+  "recommendedLevels": [
+    "Moderate-intensity aerobic activity (such as brisk walking) for 150 minutes every week (for example, 30 minutes a day, 5 days a week).",
+    "Muscle-strengthening activities on 2 or more days a week that work all major muscle groups (legs, hips, back, abdomen, chest, shoulders, and arms).",
+    "Vigorous-intensity aerobic activity (such as jogging or running) for 75 minutes (1 hour and 15 minutes) every week.",
+    "An equivalent mix of moderate- and vigorous-intensity aerobic activity on 2 or more days a week."
+  ]
+}

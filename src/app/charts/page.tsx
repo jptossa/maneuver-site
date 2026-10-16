@@ -19,7 +19,8 @@ import {
 } from "@/lib/aggregate";
 import { GROUP_SERIES, TYPE_SERIES } from "@/lib/chart-colors";
 import { getActivities } from "@/lib/data";
-import { getUnits } from "@/lib/preferences";
+import { totalCalories } from "@/lib/calories";
+import { getUnits, getWeightKg } from "@/lib/preferences";
 import { distanceUnit } from "@/lib/units";
 import {
   parseDate,
@@ -32,7 +33,7 @@ import {
 export const metadata: Metadata = { title: "Charts · Maneuver" };
 
 // Distance's unit depends on the user's preference (see distanceUnit).
-const UNITS = { minutes: "min", sessions: "" } as const;
+const UNITS = { minutes: "min", sessions: "", calories: "kcal" } as const;
 
 async function ChartsView({ searchParams }: PageProps<"/charts">) {
   const sp = await searchParams;
@@ -47,8 +48,9 @@ async function ChartsView({ searchParams }: PageProps<"/charts">) {
     to: period.end,
   });
   const units = await getUnits();
+  const weightKg = await getWeightKg();
   const series = by === "group" ? GROUP_SERIES : TYPE_SERIES;
-  const rows: BarRow[] = bucketActivities(activities, period, metric, units).map(
+  const rows: BarRow[] = bucketActivities(activities, period, metric, units, weightKg).map(
     (b) => ({
       label: b.label,
       ...(by === "group" ? rollUpByGroup(b.byType) : b.byType),
@@ -57,11 +59,11 @@ async function ChartsView({ searchParams }: PageProps<"/charts">) {
   const seriesByKey = new Map(series.map((s) => [s.key, s]));
   const totals = (
     by === "group"
-      ? totalsByGroup(activities, metric, units).map((t) => ({
+      ? totalsByGroup(activities, metric, units, weightKg).map((t) => ({
           key: t.group as string,
           value: t.value,
         }))
-      : totalsByType(activities, metric, units).map((t) => ({
+      : totalsByType(activities, metric, units, weightKg).map((t) => ({
           key: t.type as string,
           value: t.value,
         }))
@@ -91,9 +93,15 @@ async function ChartsView({ searchParams }: PageProps<"/charts">) {
         metric={metric}
         by={by}
       />
-      <SummaryCards summary={summarize(activities)} units={units} />
+      <SummaryCards
+        summary={summarize(activities)}
+        units={units}
+        calories={totalCalories(activities, weightKg)}
+      />
       {activities.length === 0 ? (
         <p>No activity recorded for this period.</p>
+      ) : metric === "calories" && weightKg === null ? (
+        <p>Enter your weight in the header to chart estimated calories.</p>
       ) : (
         <>
           <h2>Over time</h2>

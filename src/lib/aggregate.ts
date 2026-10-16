@@ -19,13 +19,18 @@ import {
   type Period,
   type Summary,
 } from "./types";
+import { estimateCalories } from "./calories";
 import { kmToDisplay, type UnitSystem } from "./units";
 
-/** Value of metric for one activity. Distance is returned in the user's display unit (storage is km). */
+/**
+ * Value of metric for one activity. Distance is returned in the user's display unit
+ * (storage is km). Calories are estimates and 0 when there is no weight or MET entry.
+ */
 export function metricValue(
   a: Activity,
   metric: Metric,
   units: UnitSystem,
+  weightKg: number | null,
 ): number {
   switch (metric) {
     case "minutes":
@@ -34,6 +39,8 @@ export function metricValue(
       return kmToDisplay(a.distanceKm ?? 0, units);
     case "sessions":
       return 1;
+    case "calories":
+      return estimateCalories(a, weightKg) ?? 0;
   }
 }
 
@@ -56,12 +63,13 @@ function makeBucket(
   items: Activity[],
   metric: Metric,
   units: UnitSystem,
+  weightKg: number | null,
 ): Bucket {
   const byType = emptyByType();
   let totalMin = 0;
   let totalKm = 0;
   for (const a of items) {
-    byType[a.type] = round1(byType[a.type] + metricValue(a, metric, units));
+    byType[a.type] = round1(byType[a.type] + metricValue(a, metric, units, weightKg));
     totalMin += a.durationMin;
     totalKm += a.distanceKm ?? 0;
   }
@@ -89,13 +97,14 @@ export function bucketActivities(
   period: Period,
   metric: Metric,
   units: UnitSystem,
+  weightKg: number | null,
 ): Bucket[] {
   const start = parseISO(period.start);
   const end = parseISO(period.end);
 
   if (period.scale === "day") {
     return activities.map((a) =>
-      makeBucket(a.id, activityLabel(a.type), a.date, a.date, [a], metric, units),
+      makeBucket(a.id, activityLabel(a.type), a.date, a.date, [a], metric, units, weightKg),
     );
   }
 
@@ -111,6 +120,7 @@ export function bucketActivities(
         items,
         metric,
         units,
+        weightKg,
       );
     });
   }
@@ -119,7 +129,7 @@ export function bucketActivities(
   return eachDayOfInterval({ start, end }).map((d) => {
     const iso = format(d, "yyyy-MM-dd");
     const items = activities.filter((a) => a.date === iso);
-    return makeBucket(iso, format(d, labelFmt), iso, iso, items, metric, units);
+    return makeBucket(iso, format(d, labelFmt), iso, iso, items, metric, units, weightKg);
   });
 }
 
@@ -136,10 +146,11 @@ export function totalsByType(
   activities: Activity[],
   metric: Metric,
   units: UnitSystem,
+  weightKg: number | null,
 ): { type: ActivityType; value: number }[] {
   const byType = emptyByType();
   for (const a of activities) {
-    byType[a.type] = round1(byType[a.type] + metricValue(a, metric, units));
+    byType[a.type] = round1(byType[a.type] + metricValue(a, metric, units, weightKg));
   }
   return ACTIVITY_TYPES.map((type) => ({ type, value: byType[type] })).filter(
     (t) => t.value > 0,
@@ -165,10 +176,11 @@ export function totalsByGroup(
   activities: Activity[],
   metric: Metric,
   units: UnitSystem,
+  weightKg: number | null,
 ): { group: ActivityGroup; value: number }[] {
   const byType = emptyByType();
   for (const a of activities) {
-    byType[a.type] = round1(byType[a.type] + metricValue(a, metric, units));
+    byType[a.type] = round1(byType[a.type] + metricValue(a, metric, units, weightKg));
   }
   const byGroup = rollUpByGroup(byType);
   return ACTIVITY_GROUPS.map((group) => ({ group, value: byGroup[group] })).filter(

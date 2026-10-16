@@ -16,7 +16,7 @@ export type Timescale = (typeof TIMESCALES)[number];
 export const GROUPINGS = ["type", "group"] as const;
 export type Grouping = (typeof GROUPINGS)[number];
 
-export const METRICS =["minutes", "distance", "sessions"] as const;
+export const METRICS =["minutes", "distance", "sessions", "calories"] as const;
 export type Metric = (typeof METRICS)[number];
 
 /** Mirrors a future Supabase `activities` row (minus user_id). */

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { safeNext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { parseUnits } from "@/lib/units";
+import { displayToKgWeight, parseUnits, weightUnit } from "@/lib/units";
 
 function field(formData: FormData, name: string) {
   const v = formData.get(name);
@@ -59,6 +59,33 @@ export async function setUnits(formData: FormData) {
   // getUnits() reads user_metadata from the JWT, which is stale until the session
   // is refreshed, so refresh now to make the new preference visible immediately.
   await supabase.auth.refreshSession();
+
+  revalidatePath("/", "layout");
+}
+
+/**
+ * Saves body weight (`user_metadata.weightKg`), typed in the account's current unit.
+ * An empty field clears it; an implausible number is ignored (the input also has min/max).
+ */
+export async function setWeight(formData: FormData) {
+  const raw = field(formData, "weight");
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  if (!data?.claims) redirect("/login");
+
+  let weightKg: number | null;
+  if (raw === "") {
+    weightKg = null;
+  } else {
+    const typed = Number(raw);
+    const unit = weightUnit(parseUnits(data.claims.user_metadata?.units));
+    weightKg = Number.isFinite(typed) ? displayToKgWeight(typed, unit) : null;
+    if (weightKg === null) return;
+  }
+
+  const { error } = await supabase.auth.updateUser({ data: { weightKg } });
+  if (error) throw new Error(`Failed to save weight: ${error.message}`);
+  await supabase.auth.refreshSession(); // claims are read from the JWT; see setUnits
 
   revalidatePath("/", "layout");
 }

@@ -52,6 +52,41 @@ export function displayDistance(km: number, units: UnitSystem): number {
   return round(kmToDisplay(km, units), 1);
 }
 
+// Body weight (for calorie estimates) is stored in kilograms in user_metadata.weightKg.
+
+export type WeightUnit = "lb" | "kg";
+
+export const KG_PER_LB = 0.45359237;
+/** Plausible adult range, in kg; also the bounds enforced on input. */
+export const MIN_WEIGHT_KG = 20;
+export const MAX_WEIGHT_KG = 500;
+
+export function weightUnit(units: UnitSystem): WeightUnit {
+  return units === "us" ? "lb" : "kg";
+}
+
+/** Kilograms (storage) -> the user's display unit, rounded to 1 decimal. */
+export function kgToDisplay(kg: number, units: UnitSystem): number {
+  return round(units === "us" ? kg / KG_PER_LB : kg, 1);
+}
+
+/** A weight typed in `unit` -> kilograms, or null when it isn't a plausible weight. */
+export function displayToKgWeight(value: number, unit: WeightUnit): number | null {
+  return parseWeightKg(unit === "lb" ? value * KG_PER_LB : value);
+}
+
+/** Allow-list for stored values (users can edit their own metadata): null unless plausible. */
+export function parseWeightKg(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  if (value < MIN_WEIGHT_KG || value > MAX_WEIGHT_KG) return null;
+  return round(value, 1);
+}
+
+/** Form prefill: "" when no weight is set. */
+export function weightInputValue(kg: number | null, units: UnitSystem): string {
+  return kg === null ? "" : String(kgToDisplay(kg, units));
+}
+
 /** Form prefill: 2 decimals, no trailing zeros, "" when there is no distance. */
 export function distanceInputValue(
   km: number | null,

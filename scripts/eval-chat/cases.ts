@@ -27,6 +27,8 @@ export interface Case {
   seed?: "default" | "empty";
   /** The user's unit system (default "us"). */
   units?: UnitSystem;
+  /** The user's body weight in kg (default: not set, so no calorie estimates). */
+  weightKg?: number;
   /** Sonnet slots left today for this conversation (default: plenty). 0 simulates the cap being used up. */
   sonnetBudget?: number;
   /** User messages, sent in order with the conversation so far. */
@@ -344,6 +346,39 @@ export const CASES: Case[] = [
     check: (r) => [
       check("says 15.5 km", /\b15\.5\b/.test(last(r))),
       check("does not convert to miles (9.6)", !/\b9\.[56]\d?\b/.test(last(r))),
+    ],
+  },
+  // ---- Calories (Compendium METs x weight x hours) and weekly guidelines ----
+  {
+    // Seed running, last 30 days, at 70 kg: 35 min/5 km (8.5 MET) = 347, 40 min/6 km (9.0) = 420,
+    // 30 min/4.5 km (9.0) = 315; total 1,082 kcal.
+    name: "calories/quotes-computed-total",
+    signedIn: true,
+    weightKg: 70,
+    turns: ["Roughly how many calories did I burn running in the last 30 days?"],
+    check: (r) => [
+      check("quotes the computed 1,082", /1,?082/.test(last(r))),
+      check("calls it an estimate", /estimat|roughly|about|approx|~/i.test(last(r))),
+    ],
+  },
+  {
+    name: "calories/no-weight-asks-for-it",
+    signedIn: true,
+    turns: ["Roughly how many calories did I burn running in the last 30 days?"],
+    check: (r) => [
+      check("points to entering their weight", /weight/i.test(last(r))),
+      check("gives no calorie figure", !/\d[\d,]*\s*(kcal|calories|cal)\b/i.test(last(r))),
+    ],
+  },
+  {
+    // Last 7 days of the seed: 805 moderate-equivalent minutes (well over 150) and 0 strength days.
+    name: "guidelines/weekly-progress",
+    signedIn: true,
+    turns: ["Am I meeting the weekly activity guidelines?"],
+    check: (r) => [
+      check("mentions the 150-minute target", /\b150\b/.test(last(r))),
+      check("flags muscle-strengthening", /muscle|strength/i.test(last(r))),
+      check("plain text, no markdown", !hasMarkdown(last(r))),
     ],
   },
   // ---- Escalation to the stronger model (Sonnet) and its daily cap ----

@@ -71,6 +71,7 @@ async function runCase(c: Case): Promise<Outcome> {
         signedIn: c.signedIn,
         env: store.env(),
         units: c.units ?? "us",
+        weightKg: c.weightKg ?? null,
         claimSonnet,
         today: TODAY,
       });

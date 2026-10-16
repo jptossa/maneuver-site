@@ -47,6 +47,8 @@ export async function runAgent(opts: {
   env: ToolEnv;
   /** The user's unit system: tool results and replies use it for distances. */
   units: UnitSystem;
+  /** Body weight in kg for calorie estimates; null when the user hasn't set it. */
+  weightKg: number | null;
   /** Claims one of the day's escalations; resolves false when none are left. */
   claimSonnet: () => Promise<boolean>;
   today?: Date;
@@ -57,7 +59,7 @@ export async function runAgent(opts: {
   const today = opts.today ?? new Date();
   const client = new Anthropic();
   const snapshot = opts.signedIn
-    ? await loadHistorySnapshot(today, opts.env, opts.units)
+    ? await loadHistorySnapshot(today, opts.env, opts.units, opts.weightKg)
     : undefined;
   const baseMessages = (): Anthropic.MessageParam[] =>
     opts.history.map((m) => ({ role: m.role, content: m.content }));
@@ -170,7 +172,7 @@ export async function runAgent(opts: {
         });
         continue;
       }
-      const outcome = await runTool(call.name, call.input, today, opts.env, opts.units);
+      const outcome = await runTool(call.name, call.input, today, opts.env, opts.units, opts.weightKg);
       wrote ||= outcome.wrote === true;
       results.push({
         type: "tool_result",
