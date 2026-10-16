@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { runAgent, type ChatTurn } from "@/lib/chatbot/agent";
 import { LIMITS } from "@/lib/chatbot/config";
-import { liveEnv } from "@/lib/chatbot/live-env";
+import { claimSonnetUse, liveEnv } from "@/lib/chatbot/live-env";
 import type { ChatEvent } from "@/lib/chatbot/protocol";
 import { allowRequest } from "@/lib/chatbot/rate-limit";
 import { getSupabaseEnv } from "@/lib/supabase/env";
@@ -93,6 +93,7 @@ export async function POST(request: Request) {
           history,
           signedIn,
           env: liveEnv,
+          claimSonnet: claimSonnetUse,
           signal: request.signal,
           onText: (delta) => send({ type: "text", delta }),
         });

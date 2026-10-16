@@ -11,6 +11,10 @@ export interface Check {
 /** Everything a case's checks can look at after the conversation has run. */
 export interface Run {
   replies: string[];
+  /** Per turn: did the stronger model answer? */
+  escalated: boolean[];
+  /** How many times the assistant asked for a Sonnet slot. */
+  claimAttempts: number;
   before: Activity[];
   after: Activity[];
 }
@@ -20,6 +24,8 @@ export interface Case {
   signedIn: boolean;
   /** "empty" gives a signed-in user with no history at all. */
   seed?: "default" | "empty";
+  /** Sonnet slots left today for this conversation (default: plenty). 0 simulates the cap being used up. */
+  sonnetBudget?: number;
   /** User messages, sent in order with the conversation so far. */
   turns: string[];
   check: (run: Run) => Check[];
@@ -53,6 +59,10 @@ const activityWords = [
 ];
 const mentionsActivity = (s: string) =>
   activityWords.some((w) => s.toLowerCase().includes(w));
+
+// A question that needs real planning across several constraints, so it should escalate.
+const HARD_QUESTION =
+  "I'm 52, my left tibia had a stress fracture six weeks ago and I've been cleared for light activity. I work 9 to 5 with a 40 minute bike commute, I can train 4 days a week, and I want to run a half marathon in 20 weeks. Lay out how to ramp up week by week without re-injuring myself.";
 
 // The seed is relative to the fixed TODAY in store.ts: Wednesday 2026-10-14.
 export const CASES: Case[] = [
@@ -252,6 +262,64 @@ export const CASES: Case[] = [
       check("exactly one new entry", added(r).length === 1),
       check("answers that it was logged once", /\b(no|once|one|single)\b/i.test(last(r))),
       check("does not say yes or 'correct' itself", !/\byes\b|need to correct|to correct my/i.test(last(r))),
+    ],
+  },
+
+  // ---- Escalation to the stronger model (Sonnet) and its daily cap ----
+  {
+    name: "esc/hard-question-goes-to-sonnet",
+    signedIn: false,
+    turns: [HARD_QUESTION],
+    check: (r) => [
+      check("the stronger model answered", r.escalated[0] === true),
+      check("gives a real, substantial answer", last(r).length > 400),
+      check("keeps the injury caution", /doctor|physio|healthcare|health care|medical|professional|cleared|clearance/i.test(last(r))),
+      check("plain text, no markdown", !hasMarkdown(last(r))),
+    ],
+  },
+  {
+    name: "esc/easy-question-stays-on-default-model",
+    signedIn: false,
+    turns: ["Give me a quick idea for a lunch break."],
+    check: (r) => [
+      check("not escalated", r.escalated[0] === false),
+      check("never asked for a Sonnet slot", r.claimAttempts === 0),
+    ],
+  },
+  {
+    name: "esc/cap-used-up-still-answers",
+    signedIn: false,
+    sonnetBudget: 0,
+    turns: [HARD_QUESTION],
+    check: (r) => [
+      check("not escalated", r.escalated[0] === false),
+      check("still gives a real answer", last(r).length > 250),
+      check("does not mention the escalation or a stronger model", !/escalat|stronger model|bigger model|senior|rationed|daily (limit|cap)/i.test(last(r))),
+      check("keeps the injury caution", /doctor|physio|healthcare|health care|medical|professional|cleared|clearance/i.test(last(r))),
+    ],
+  },
+  {
+    name: "esc/routine-requests-never-escalate",
+    signedIn: true,
+    turns: [
+      "Log a 25 minute run I did today.",
+      "Plan a 30 minute yoga session for tomorrow.",
+    ],
+    check: (r) => [
+      check("neither turn escalated", r.escalated.every((e) => !e)),
+      check("both entries were saved", added(r).length === 2),
+    ],
+  },
+  {
+    name: "esc/signed-in-hard-plan-uses-history",
+    signedIn: true,
+    turns: [
+      "Using my last month of activity, lay out a 4-week plan to get me ready for a 10k. I can train 4 days a week and my planned Saturday hike has to stay.",
+    ],
+    check: (r) => [
+      check("the stronger model answered", r.escalated[0] === true),
+      check("keeps the Saturday hike", /hike/i.test(last(r)) && /saturday/i.test(last(r))),
+      check("covers the four weeks", /week\s*4|fourth week|4th week/i.test(last(r))),
     ],
   },
 ];

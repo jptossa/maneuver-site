@@ -50,21 +50,35 @@ async function runCase(c: Case): Promise<Outcome> {
   const before = store.snapshot();
   const history: ChatTurn[] = [];
   const replies: string[] = [];
+  const escalated: boolean[] = [];
   const lines: string[] = [];
+  // Stand-in for the site-wide daily Sonnet cap (a Supabase counter in the app).
+  let sonnetBudget = c.sonnetBudget ?? 100;
+  let claimAttempts = 0;
+  const claimSonnet = async () => {
+    claimAttempts++;
+    if (sonnetBudget <= 0) return false;
+    sonnetBudget--;
+    return true;
+  };
 
   try {
     for (const turn of c.turns) {
       history.push({ role: "user", content: turn });
       lines.push(`  You: ${turn}`);
-      const { reply } = await runAgent({
+      const result = await runAgent({
         history,
         signedIn: c.signedIn,
         env: store.env(),
+        claimSonnet,
         today: TODAY,
       });
-      history.push({ role: "assistant", content: reply });
-      replies.push(reply);
-      lines.push(`  Bot: ${reply.replace(/\n/g, "\n       ")}`);
+      history.push({ role: "assistant", content: result.reply });
+      replies.push(result.reply);
+      escalated.push(result.escalated);
+      lines.push(
+        `  Bot${result.escalated ? " [escalated]" : ""}: ${result.reply.replace(/\n/g, "\n       ")}`,
+      );
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
@@ -77,7 +91,13 @@ async function runCase(c: Case): Promise<Outcome> {
 
   return {
     name: c.name,
-    checks: c.check({ replies, before, after: store.snapshot() }),
+    checks: c.check({
+      replies,
+      escalated,
+      claimAttempts,
+      before,
+      after: store.snapshot(),
+    }),
     transcript: lines.join("\n"),
   };
 }
