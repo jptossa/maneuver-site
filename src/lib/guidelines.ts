@@ -7,8 +7,16 @@ import type { CatalogType } from "./activity-catalog";
 import { intensityOf, metEntry } from "./met";
 import type { Activity } from "./types";
 
-/** From the CDC page: 150 moderate (or 75 vigorous) minutes a week, plus 2 muscle-strengthening days. */
-export const WEEKLY_TARGET = { moderateEquivalentMinutes: 150, muscleStrengtheningDays: 2 } as const;
+/** Parsed from the CDC page by the scraper: e.g. 150 moderate (or 75 vigorous) minutes, plus 2 muscle days. */
+export const WEEKLY_TARGET = {
+  moderateEquivalentMinutes: guidelines.targets.moderateMinutes,
+  muscleStrengtheningDays: guidelines.targets.muscleStrengtheningDays,
+};
+
+export const GUIDELINES_SOURCE = {
+  name: guidelines.source,
+  url: guidelines.sourceUrl,
+};
 
 /** Counted toward the muscle-strengthening target; they are not counted as aerobic minutes. */
 const MUSCLE_STRENGTHENING: readonly CatalogType[] = ["strength", "calisthenics", "climbing"];

@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -7,6 +7,7 @@ import ActivityList from "@/components/ActivityList";
 import PeriodNav from "@/components/PeriodNav";
 import PlannedList from "@/components/PlannedList";
 import SummaryCards from "@/components/SummaryCards";
+import WeeklyGuidelines from "@/components/WeeklyGuidelines";
 import TimescaleTabs from "@/components/TimescaleTabs";
 import { bucketActivities, summarize } from "@/lib/aggregate";
 import { loadSampleData } from "@/app/activity/actions";
@@ -14,6 +15,7 @@ import { getActivities, hasAnyActivity } from "@/lib/data";
 import { buildHref } from "@/lib/href";
 import { parseDate, parseScale, resolvePeriod } from "@/lib/period";
 import { totalCalories } from "@/lib/calories";
+import { guidelineProgress } from "@/lib/guidelines";
 import { getUnits, getWeightKg } from "@/lib/preferences";
 
 export const metadata: Metadata = { title: "Activity · Maneuver" };
@@ -36,6 +38,10 @@ async function ActivityView({ searchParams }: PageProps<"/activity">) {
   const planned = all.filter((a) => a.status === "planned");
   const units = await getUnits();
   const weightKg = await getWeightKg();
+  // The weekly-guideline card always covers the last 7 days, whatever period is being viewed.
+  const weekProgress = guidelineProgress(
+    await getActivities({ from: format(subDays(today, 6), "yyyy-MM-dd"), to: format(today, "yyyy-MM-dd") }),
+  );
   const buckets = bucketActivities(activities, period, "minutes", units);
   // Only offer sample data to accounts with no history at all, not for every empty period.
   const showSampleData = all.length === 0 && !(await hasAnyActivity());
@@ -70,6 +76,7 @@ async function ActivityView({ searchParams }: PageProps<"/activity">) {
           </small>
         </p>
       )}
+      <WeeklyGuidelines progress={weekProgress} />
       <ActivityList
         period={period}
         activities={activities}

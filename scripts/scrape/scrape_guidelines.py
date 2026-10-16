@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -49,7 +50,34 @@ def parse(html: str) -> dict:
 
     if not key_points or not levels:
         raise ValueError("CDC page layout changed: key points or recommended levels not found")
-    return {"keyPoints": key_points, "recommendedLevels": levels}
+    return {
+        "targets": parse_targets(key_points, levels),
+        "keyPoints": key_points,
+        "recommendedLevels": levels,
+    }
+
+
+def parse_targets(key_points: list[str], levels: list[str]) -> dict:
+    """Pull the weekly numbers out of the text so the app doesn't hard-code them."""
+
+    def find(pattern: str, lines: list[str]) -> int:
+        for line in lines:
+            m = re.search(pattern, line)
+            if m:
+                return int(m.group(1))
+        raise ValueError(f"CDC page wording changed: nothing matched {pattern!r}")
+
+    moderate = find(r"(\d+) minutes of moderate-intensity", key_points)
+    vigorous = find(r"[Vv]igorous-intensity[^.]*?(\d+) minutes", levels)
+    muscle = find(r"(\d+) days of muscle-strengthening", key_points)
+    # The app counts one vigorous minute as two moderate ones; fail if the CDC's numbers disagree.
+    if moderate != 2 * vigorous:
+        raise ValueError(f"Expected moderate = 2 x vigorous, got {moderate} and {vigorous}")
+    return {
+        "moderateMinutes": moderate,
+        "vigorousMinutes": vigorous,
+        "muscleStrengtheningDays": muscle,
+    }
 
 
 def main() -> None:
