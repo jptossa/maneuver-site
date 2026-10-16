@@ -1,4 +1,6 @@
+import Image from "next/image";
 import Link from "next/link";
+import heroPhoto from "@/assets/hero.jpg";
 
 const benefits = [
   {
@@ -40,22 +42,39 @@ const services = [
 export default function Home() {
   return (
     <>
+      {/* Decorative full-width backdrop behind the header and hero; the scrim in globals.css keeps the text readable in both themes. */}
+      <div className="hero-backdrop" aria-hidden="true">
+        {/* The frame starts below the sticky header so the fighters' heads aren't hidden or cropped. */}
+        <div className="hero-photo-frame">
+          <Image
+            src={heroPhoto}
+            alt=""
+            fill
+            sizes="100vw"
+            loading="eager"
+            fetchPriority="high"
+            className="hero-photo"
+          />
+        </div>
+      </div>
       <section className="hero">
-        <h1>Move more. Notice more.</h1>
-        <p>
-          Our mission is to make everyday movement visible and rewarding, so
-          anyone can build a more active life — one maneuver at a time.
-        </p>
-        <p className="cta">
-          <Link href="/signup" className="button">
-            Sign up free
-          </Link>{" "}
-          <Link href="/login" className="button secondary">
-            Log in
-          </Link>{" "}
-          <Link href="/activity">View my activity</Link>{" "}
-          <Link href="/charts">See the charts</Link>
-        </p>
+        <div className="hero-content">
+          <h1>Move more. Notice more.</h1>
+          <p>
+            Our mission is to make everyday movement visible and rewarding, so
+            anyone can build a more active life — one maneuver at a time.
+          </p>
+          <p className="cta">
+            <Link href="/signup" className="button">
+              Sign up free
+            </Link>{" "}
+            <Link href="/login" className="button secondary">
+              Log in
+            </Link>{" "}
+            <Link href="/activity">View my activity</Link>{" "}
+            <Link href="/charts">See the charts</Link>
+          </p>
+        </div>
       </section>
 
       <section>
