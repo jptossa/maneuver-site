@@ -40,15 +40,19 @@ const services = [
 export default function Home() {
   return (
     <>
-      <section>
+      <section className="hero">
         <h1>Move more. Notice more.</h1>
         <p>
           Our mission is to make everyday movement visible and rewarding, so
           anyone can build a more active life — one maneuver at a time.
         </p>
-        <p>
-          <Link href="/signup">Sign up free</Link>{" "}
-          <Link href="/login">Log in</Link>{" "}
+        <p className="cta">
+          <Link href="/signup" className="button">
+            Sign up free
+          </Link>{" "}
+          <Link href="/login" className="button secondary">
+            Log in
+          </Link>{" "}
           <Link href="/activity">View my activity</Link>{" "}
           <Link href="/charts">See the charts</Link>
         </p>
@@ -56,7 +60,7 @@ export default function Home() {
 
       <section>
         <h2>Why Maneuver</h2>
-        <ul>
+        <ul className="cards">
           {benefits.map((b) => (
             <li key={b.title}>
               <h3>{b.title}</h3>
@@ -68,7 +72,7 @@ export default function Home() {
 
       <section>
         <h2>What we offer</h2>
-        <ul>
+        <ul className="cards">
           {services.map((s) => (
             <li key={s.title}>
               <h3>{s.href ? <Link href={s.href}>{s.title}</Link> : s.title}</h3>

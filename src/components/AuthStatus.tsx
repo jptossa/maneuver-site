@@ -27,18 +27,24 @@ export default async function AuthStatus() {
 
   if (!email) {
     return (
-      <>
-        <Link href="/login">Log in</Link> <Link href="/signup">Sign up</Link>
-      </>
+      <span className="auth-links">
+        <Link href="/login">Log in</Link>
+        <Link href="/signup">Sign up</Link>
+      </span>
     );
   }
 
   return (
     <>
-      <UnitToggle units={units} />
-      <WeightForm weightKg={weightKg} units={units} />
-      <LocationForm location={location} />
-      <form action={signout}>
+      <details className="settings">
+        <summary>Settings</summary>
+        <div>
+          <UnitToggle units={units} />
+          <WeightForm weightKg={weightKg} units={units} />
+          <LocationForm location={location} />
+        </div>
+      </details>
+      <form action={signout} className="account">
         <small>{email}</small> <button type="submit">Log out</button>
       </form>
     </>
