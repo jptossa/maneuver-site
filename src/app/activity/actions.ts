@@ -17,8 +17,10 @@ import {
 } from "@/lib/data";
 import { buildHref } from "@/lib/href";
 import { getMockActivities } from "@/lib/mock-data";
+import { getUnits } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 import type { ActivityStatus } from "@/lib/types";
+import { distanceUnit, parseDistanceUnit } from "@/lib/units";
 
 const BATCH_SIZE = 500;
 
@@ -28,6 +30,14 @@ async function requireUser(next: string) {
   const { data } = await supabase.auth.getClaims();
   if (!data?.claims) redirect(`/login?next=${encodeURIComponent(next)}`);
   return supabase;
+}
+
+/** The unit the form was rendered in (hidden field), else the user's current preference. */
+async function formDistanceUnit(formData: FormData) {
+  return (
+    parseDistanceUnit(formData.get("distanceUnit")) ??
+    distanceUnit(await getUnits())
+  );
 }
 
 function revalidateActivity() {
@@ -45,7 +55,12 @@ async function create(
   formData: FormData,
 ): Promise<ActivityFormState> {
   const raw = formDataToRaw(formData);
-  const result = parseActivityInput(raw, new Date(), status);
+  const result = parseActivityInput(
+    raw,
+    new Date(),
+    status,
+    await formDistanceUnit(formData),
+  );
   if (!result.ok) return { errors: result.errors, values: raw };
 
   await requireUser(formPath);
@@ -77,7 +92,12 @@ export async function updateActivityAction(
   formData: FormData,
 ): Promise<ActivityFormState> {
   const raw = formDataToRaw(formData);
-  const result = parseActivityInput(raw, new Date(), status);
+  const result = parseActivityInput(
+    raw,
+    new Date(),
+    status,
+    await formDistanceUnit(formData),
+  );
   if (!result.ok) return { errors: result.errors, values: raw };
 
   await requireUser(`/activity/${id}/edit`);

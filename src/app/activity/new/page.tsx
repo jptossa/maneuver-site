@@ -6,6 +6,8 @@ import { createActivityAction } from "@/app/activity/actions";
 import ActivityForm from "@/components/ActivityForm";
 import { buildHref } from "@/lib/href";
 import { parseDate } from "@/lib/period";
+import { getUnits } from "@/lib/preferences";
+import { distanceUnit } from "@/lib/units";
 
 export const metadata: Metadata = { title: "Log activity · Maneuver" };
 
@@ -25,6 +27,7 @@ async function NewActivityForm({ searchParams }: PageProps<"/activity/new">) {
       maxDate={todayIso}
       cancelHref={buildHref("/activity", { scale: "day", date })}
       submitLabel="Log activity"
+      unit={distanceUnit(await getUnits())}
     />
   );
 }

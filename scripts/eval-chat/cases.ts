@@ -1,6 +1,7 @@
 import { ACTIVITY_CATALOG } from "@/lib/activity-catalog";
 import { REPRESENTATIVE } from "@/lib/chatbot/config";
 import type { Activity } from "@/lib/types";
+import type { UnitSystem } from "@/lib/units";
 import { dayOffset, defaultSeed } from "./store";
 
 export interface Check {
@@ -24,6 +25,8 @@ export interface Case {
   signedIn: boolean;
   /** "empty" gives a signed-in user with no history at all. */
   seed?: "default" | "empty";
+  /** The user's unit system (default "us"). */
+  units?: UnitSystem;
   /** Sonnet slots left today for this conversation (default: plenty). 0 simulates the cap being used up. */
   sonnetBudget?: number;
   /** User messages, sent in order with the conversation so far. */
@@ -265,6 +268,84 @@ export const CASES: Case[] = [
     ],
   },
 
+  // ---- Units: the user's preference decides what the assistant reports; either unit is accepted on input ----
+  {
+    name: "units/us-logs-miles",
+    signedIn: true,
+    units: "us",
+    turns: ["I ran 3 miles this morning, it took me 30 minutes. Log it."],
+    check: (r) => {
+      const [a] = added(r);
+      return [
+        check("exactly one new entry", added(r).length === 1),
+        check("a completed 30 minute run of about 4.83 km", !!a && a.type === "running" && a.status === "completed" && a.durationMin === 30 && !!a.distanceKm && Math.abs(a.distanceKm - 4.83) < 0.05),
+        check("reply uses miles, not km", /\b(mi|miles?)\b/i.test(last(r)) && !/\bkm\b|kilomet/i.test(last(r))),
+      ];
+    },
+  },
+  {
+    name: "units/us-converts-km-input",
+    signedIn: true,
+    units: "us",
+    turns: ["I biked 10 km yesterday for about 40 minutes. Please log it."],
+    check: (r) => {
+      const [a] = added(r);
+      return [
+        check("exactly one new entry", added(r).length === 1),
+        check("a completed 40 minute ride of 10 km dated yesterday", !!a && a.type === "cycling" && a.durationMin === 40 && !!a.distanceKm && Math.abs(a.distanceKm - 10) < 0.05 && a.date === dayOffset(-1)),
+        check("reply reports it in miles (about 6.2)", /\b6\.[12]\d?\b|\bmiles?\b/i.test(last(r))),
+      ];
+    },
+  },
+  {
+    name: "units/metric-logs-km",
+    signedIn: true,
+    units: "metric",
+    turns: ["I ran 5 km today in 30 minutes. Log it."],
+    check: (r) => {
+      const [a] = added(r);
+      return [
+        check("exactly one new entry", added(r).length === 1),
+        check("a completed 30 minute run of 5 km", !!a && a.type === "running" && a.status === "completed" && a.durationMin === 30 && !!a.distanceKm && Math.abs(a.distanceKm - 5) < 0.05),
+        check("reply uses km, not miles", /\bkm\b|kilomet/i.test(last(r)) && !/\bmiles?\b/i.test(last(r))),
+      ];
+    },
+  },
+  {
+    name: "units/metric-converts-miles-input",
+    signedIn: true,
+    units: "metric",
+    turns: ["I walked 2 miles today, about 40 minutes. Log it."],
+    check: (r) => {
+      const [a] = added(r);
+      return [
+        check("exactly one new entry", added(r).length === 1),
+        check("a completed 40 minute walk of about 3.22 km", !!a && a.type === "walking" && a.durationMin === 40 && !!a.distanceKm && Math.abs(a.distanceKm - 3.22) < 0.05),
+        check("reply reports it in km (about 3.2)", /\b3\.2\d?\b|\bkm\b|kilomet/i.test(last(r))),
+      ];
+    },
+  },
+  {
+    // Seed: 5 + 6 + 4.5 = 15.5 km of running in the last 30 days (about 9.6 miles).
+    name: "units/us-history-in-miles",
+    signedIn: true,
+    units: "us",
+    turns: ["How far did I run in total over the last 30 days?"],
+    check: (r) => [
+      check("says about 9.6 miles", /\b9\.[56]\d?\b/.test(last(r))),
+      check("does not quote the raw 15.5 km", !/\b15\.5\b/.test(last(r))),
+    ],
+  },
+  {
+    name: "units/metric-history-in-km",
+    signedIn: true,
+    units: "metric",
+    turns: ["How far did I run in total over the last 30 days?"],
+    check: (r) => [
+      check("says 15.5 km", /\b15\.5\b/.test(last(r))),
+      check("does not convert to miles (9.6)", !/\b9\.[56]\d?\b/.test(last(r))),
+    ],
+  },
   // ---- Escalation to the stronger model (Sonnet) and its daily cap ----
   {
     name: "esc/hard-question-goes-to-sonnet",

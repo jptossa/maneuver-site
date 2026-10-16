@@ -5,6 +5,7 @@ import { buildHref } from "@/lib/href";
 import { activityLabel } from "@/lib/activity-catalog";
 import { formatDuration } from "@/lib/aggregate";
 import type { Activity, Bucket, Period } from "@/lib/types";
+import { formatDistance, type UnitSystem } from "@/lib/units";
 
 /**
  * Day scale: individual activities.
@@ -14,10 +15,12 @@ export default function ActivityList({
   period,
   activities,
   buckets,
+  units,
 }: {
   period: Period;
   activities: Activity[];
   buckets: Bucket[];
+  units: UnitSystem;
 }) {
   if (activities.length === 0) {
     return <p>No activity recorded for this period.</p>;
@@ -42,7 +45,11 @@ export default function ActivityList({
             <tr key={a.id}>
               <td>{activityLabel(a.type)}</td>
               <td>{formatDuration(a.durationMin)}</td>
-              <td>{a.distanceKm === null ? "—" : `${a.distanceKm} km`}</td>
+              <td>
+                {a.distanceKm === null
+                  ? "—"
+                  : formatDistance(a.distanceKm, units)}
+              </td>
               <td>{a.notes ?? ""}</td>
               <td>
                 <Link href={`/activity/${a.id}/edit`}>Edit</Link>
@@ -85,7 +92,7 @@ export default function ActivityList({
             </td>
             <td>{b.sessions}</td>
             <td>{formatDuration(b.totalMin)}</td>
-            <td>{b.totalKm} km</td>
+            <td>{formatDistance(b.totalKm, units)}</td>
           </tr>
         ))}
       </tbody>

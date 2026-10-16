@@ -7,6 +7,13 @@ import {
   ACTIVITY_TYPES,
   type ActivityStatus,
 } from "@/lib/types";
+import {
+  displayDistance,
+  distanceUnit,
+  formatDistance,
+  parseDistanceUnit,
+  type UnitSystem,
+} from "@/lib/units";
 import { LIMITS } from "./config";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -21,9 +28,15 @@ const activityProperties = {
     type: "integer",
     description: "Whole minutes, 1 to 1440.",
   },
-  distance_km: {
+  distance: {
     type: "number",
-    description: "Kilometres. Omit if unknown; never guess.",
+    description: "Distance, in distance_unit. Omit if unknown; never guess.",
+  },
+  distance_unit: {
+    type: "string",
+    enum: ["mi", "km"],
+    description:
+      "The unit the user stated the distance in. Omit to use their preferred unit. Never convert distances yourself.",
   },
   notes: { type: "string", description: "Optional short note." },
 } as const;
@@ -114,6 +127,7 @@ function fail(message: string): ToolOutcome {
 async function history(
   env: ToolEnv,
   input: Record<string, unknown>,
+  units: UnitSystem,
 ): Promise<ToolOutcome> {
   const from = asString(input.from);
   const to = asString(input.to);
@@ -125,29 +139,47 @@ async function history(
     return fail('status must be "completed", "planned" or "all".');
   }
 
-  return { content: await describeRange(env, from, to, status ?? "completed") };
+  return {
+    content: await describeRange(env, from, to, status ?? "completed", units),
+  };
 }
 
-/** JSON digest of the user's activities in a range: totals per status+type and the latest entries. */
+/**
+ * JSON digest of the user's activities in a range: totals per status+type and the latest entries.
+ * Distances are in the user's preferred unit (`distanceUnit`), never raw km.
+ */
 async function describeRange(
   env: ToolEnv,
   from: string,
   to: string,
   status: ActivityStatus | "all",
+  units: UnitSystem,
 ): Promise<string> {
   const rows = await env.store.getActivities({ from, to, status });
 
-  const byType: Record<string, { sessions: number; minutes: number; km: number }> = {};
+  // Sum in km (storage unit), convert once at the end to avoid compounding rounding.
+  const totals: Record<string, { sessions: number; minutes: number; km: number }> = {};
   for (const a of rows) {
-    const t = (byType[`${a.status}:${a.type}`] ??= { sessions: 0, minutes: 0, km: 0 });
+    const t = (totals[`${a.status}:${a.type}`] ??= { sessions: 0, minutes: 0, km: 0 });
     t.sessions += 1;
     t.minutes += a.durationMin;
     t.km += a.distanceKm ?? 0;
   }
+  const byType = Object.fromEntries(
+    Object.entries(totals).map(([key, t]) => [
+      key,
+      {
+        sessions: t.sessions,
+        minutes: t.minutes,
+        distance: displayDistance(t.km, units),
+      },
+    ]),
+  );
 
   const recent = rows.slice(-LIMITS.historyRows);
   return JSON.stringify({
     range: { from, to },
+    distanceUnit: distanceUnit(units),
     totalEntries: rows.length,
     showingMostRecent: recent.length,
     totalsByStatusAndType: byType,
@@ -160,7 +192,7 @@ async function describeRange(
       type: a.type,
       status: a.status,
       minutes: a.durationMin,
-      km: a.distanceKm,
+      distance: a.distanceKm === null ? null : displayDistance(a.distanceKm, units),
       notes: a.notes,
     })),
   });
@@ -175,6 +207,7 @@ async function describeRange(
 export async function loadHistorySnapshot(
   today: Date,
   env: ToolEnv,
+  units: UnitSystem,
 ): Promise<string | null> {
   const iso = (d: Date) => format(d, "yyyy-MM-dd");
   try {
@@ -183,6 +216,7 @@ export async function loadHistorySnapshot(
       iso(subDays(today, 30)),
       iso(addDays(today, 30)),
       "all",
+      units,
     );
   } catch (e) {
     console.error("chatbot history snapshot failed", e);
@@ -195,16 +229,24 @@ async function write(
   status: ActivityStatus,
   input: Record<string, unknown>,
   today: Date,
+  units: UnitSystem,
 ): Promise<ToolOutcome> {
+  // The model passes the unit the user stated; otherwise their preferred unit applies.
+  let unit = distanceUnit(units);
+  if (input.distance_unit !== undefined) {
+    const stated = parseDistanceUnit(input.distance_unit);
+    if (!stated) return fail('distance_unit must be "mi" or "km".');
+    unit = stated;
+  }
   const raw: RawInput = {
     date: asString(input.date),
     type: asString(input.type),
     durationMin: asString(input.duration_min),
-    distanceKm: asString(input.distance_km),
+    distance: asString(input.distance),
     notes: asString(input.notes),
   };
   // Same rules as the forms, so the assistant can't save anything a user couldn't.
-  const result = parseActivityInput(raw, today, status);
+  const result = parseActivityInput(raw, today, status, unit);
   if (!result.ok) {
     return fail(`Not saved. ${Object.values(result.errors).join(" ")}`);
   }
@@ -213,7 +255,7 @@ async function write(
   env.onWrite();
   const v = result.value;
   return {
-    content: `Saved as ${status}: ${v.type}, ${v.durationMin} min${v.distanceKm !== null ? `, ${v.distanceKm} km` : ""} on ${v.date}.`,
+    content: `Saved as ${status}: ${v.type}, ${v.durationMin} min${v.distanceKm !== null ? `, ${formatDistance(v.distanceKm, units)}` : ""} on ${v.date}.`,
     wrote: true,
   };
 }
@@ -224,6 +266,7 @@ async function complete(
   env: ToolEnv,
   input: Record<string, unknown>,
   today: Date,
+  units: UnitSystem,
 ): Promise<ToolOutcome> {
   const id = asString(input.id);
   // Checked here so a made-up id is a clean error, not a database type error.
@@ -237,7 +280,7 @@ async function complete(
     const date = await env.store.completeActivity(id, format(today, "yyyy-MM-dd"));
     env.onWrite();
     return {
-      content: `Marked done: ${planned.type}, ${planned.durationMin} min${planned.distanceKm !== null ? `, ${planned.distanceKm} km` : ""}, now recorded on ${date} (${format(parseISO(date), "EEEE")}).`,
+      content: `Marked done: ${planned.type}, ${planned.durationMin} min${planned.distanceKm !== null ? `, ${formatDistance(planned.distanceKm, units)}` : ""}, now recorded on ${date} (${format(parseISO(date), "EEEE")}).`,
       wrote: true,
     };
   } catch (e) {
@@ -256,6 +299,7 @@ export async function runTool(
   input: unknown,
   today: Date,
   env: ToolEnv,
+  units: UnitSystem,
 ): Promise<ToolOutcome> {
   const args =
     typeof input === "object" && input !== null
@@ -264,13 +308,13 @@ export async function runTool(
   try {
     switch (name) {
       case "get_activity_history":
-        return await history(env, args);
+        return await history(env, args, units);
       case "log_activity":
-        return await write(env, "completed", args, today);
+        return await write(env, "completed", args, today, units);
       case "plan_activity":
-        return await write(env, "planned", args, today);
+        return await write(env, "planned", args, today, units);
       case "complete_planned_activity":
-        return await complete(env, args, today);
+        return await complete(env, args, today, units);
       default:
         return fail(`Unknown tool: ${name}`);
     }

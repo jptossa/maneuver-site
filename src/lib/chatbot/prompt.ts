@@ -1,6 +1,7 @@
 import { addDays, format } from "date-fns";
 import { activityLabel } from "@/lib/activity-catalog";
 import { ACTIVITY_TYPES } from "@/lib/types";
+import { distanceUnit, distanceUnitName, type UnitSystem } from "@/lib/units";
 import { REPRESENTATIVE } from "./config";
 
 /**
@@ -14,7 +15,10 @@ export function buildSystemPrompt(opts: {
   snapshot?: string | null;
   /** True while the default model is answering: it may hand hard questions to the stronger one. */
   canEscalate: boolean;
+  /** The signed-in user's unit system. Logged-out visitors get the default. */
+  units: UnitSystem;
 }) {
+  const unitName = distanceUnitName(distanceUnit(opts.units));
   const today = format(opts.today, "EEEE, yyyy-MM-dd");
   // Precomputed so the model never has to work out weekdays from dates (it gets them wrong).
   const calendar = [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7]
@@ -45,6 +49,8 @@ Hard questions: you can hand a message to a stronger model with escalate_difficu
   if (!opts.signedIn) {
     return `${common}
 
+Distances: use ${unitName} in suggestions unless the person writes in another unit.
+
 This visitor is NOT signed in. You cannot see or change any activity data. Give general suggestions. When it would genuinely help (for example they ask about their own history, or want to log or plan something), mention once, briefly, that signing up or logging in lets you tailor recommendations to their history and log or plan activities for them. Do not pester.`;
   }
 
@@ -60,6 +66,8 @@ Use this for recommendations and for any question about their recent activity. Q
   return `${common}
 
 This user is signed in.
+
+Distances: this user's preferred unit is ${unitName} (${distanceUnit(opts.units)}). The distance values in the data above and in tool results are already in that unit (see distanceUnit), so quote and report them as is. When they state a distance in the other unit (for example "5k" or "3 miles"), pass the number as they said it with the matching distance_unit and never convert it yourself; the confirmation you get back is in their preferred unit, so report that.
 
 ${history}
 

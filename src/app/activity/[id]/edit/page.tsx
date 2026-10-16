@@ -7,6 +7,8 @@ import { updateActivityAction } from "@/app/activity/actions";
 import ActivityForm from "@/components/ActivityForm";
 import { getActivity } from "@/lib/data";
 import { buildHref } from "@/lib/href";
+import { getUnits } from "@/lib/preferences";
+import { distanceInputValue, distanceUnit } from "@/lib/units";
 
 export const metadata: Metadata = { title: "Edit activity · Maneuver" };
 
@@ -23,6 +25,7 @@ async function EditActivityForm({ params }: PageProps<"/activity/[id]/edit">) {
 
   const todayIso = format(new Date(), "yyyy-MM-dd");
   const planned = activity.status === "planned";
+  const units = await getUnits();
 
   return (
     <>
@@ -33,10 +36,10 @@ async function EditActivityForm({ params }: PageProps<"/activity/[id]/edit">) {
           date: activity.date,
           type: activity.type,
           durationMin: String(activity.durationMin),
-          distanceKm:
-            activity.distanceKm === null ? "" : String(activity.distanceKm),
+          distance: distanceInputValue(activity.distanceKm, units),
           notes: activity.notes ?? "",
         }}
+        unit={distanceUnit(units)}
         minDate={planned ? todayIso : undefined}
         maxDate={planned ? undefined : todayIso}
         cancelHref={buildHref("/activity", {

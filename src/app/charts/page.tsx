@@ -19,6 +19,8 @@ import {
 } from "@/lib/aggregate";
 import { GROUP_SERIES, TYPE_SERIES } from "@/lib/chart-colors";
 import { getActivities } from "@/lib/data";
+import { getUnits } from "@/lib/preferences";
+import { distanceUnit } from "@/lib/units";
 import {
   parseDate,
   parseGrouping,
@@ -29,7 +31,8 @@ import {
 
 export const metadata: Metadata = { title: "Charts · Maneuver" };
 
-const UNITS = { minutes: "min", distance: "km", sessions: "" } as const;
+// Distance's unit depends on the user's preference (see distanceUnit).
+const UNITS = { minutes: "min", sessions: "" } as const;
 
 async function ChartsView({ searchParams }: PageProps<"/charts">) {
   const sp = await searchParams;
@@ -43,8 +46,9 @@ async function ChartsView({ searchParams }: PageProps<"/charts">) {
     from: period.start,
     to: period.end,
   });
+  const units = await getUnits();
   const series = by === "group" ? GROUP_SERIES : TYPE_SERIES;
-  const rows: BarRow[] = bucketActivities(activities, period, metric).map(
+  const rows: BarRow[] = bucketActivities(activities, period, metric, units).map(
     (b) => ({
       label: b.label,
       ...(by === "group" ? rollUpByGroup(b.byType) : b.byType),
@@ -53,11 +57,11 @@ async function ChartsView({ searchParams }: PageProps<"/charts">) {
   const seriesByKey = new Map(series.map((s) => [s.key, s]));
   const totals = (
     by === "group"
-      ? totalsByGroup(activities, metric).map((t) => ({
+      ? totalsByGroup(activities, metric, units).map((t) => ({
           key: t.group as string,
           value: t.value,
         }))
-      : totalsByType(activities, metric).map((t) => ({
+      : totalsByType(activities, metric, units).map((t) => ({
           key: t.type as string,
           value: t.value,
         }))
@@ -87,13 +91,17 @@ async function ChartsView({ searchParams }: PageProps<"/charts">) {
         metric={metric}
         by={by}
       />
-      <SummaryCards summary={summarize(activities)} />
+      <SummaryCards summary={summarize(activities)} units={units} />
       {activities.length === 0 ? (
         <p>No activity recorded for this period.</p>
       ) : (
         <>
           <h2>Over time</h2>
-          <ActivityBarChart data={rows} series={series} unit={UNITS[metric]} />
+          <ActivityBarChart
+            data={rows}
+            series={series}
+            unit={metric === "distance" ? distanceUnit(units) : UNITS[metric]}
+          />
           <h2>{by === "group" ? "By activity group" : "By activity type"}</h2>
           <TypeBreakdownChart data={totals} />
         </>

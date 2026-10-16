@@ -6,6 +6,7 @@ import {
   REPRESENTATIVE,
 } from "./config";
 import { ESCALATE_TOOL, ESCALATE_TOOL_NAME } from "./escalation";
+import type { UnitSystem } from "@/lib/units";
 import { buildSystemPrompt } from "./prompt";
 import { SIGNED_IN_TOOLS, loadHistorySnapshot, runTool, type ToolEnv } from "./tools";
 
@@ -44,6 +45,8 @@ export async function runAgent(opts: {
   signedIn: boolean;
   /** Where signed-in tools read and write. The app passes liveEnv; evals pass an in-memory one. */
   env: ToolEnv;
+  /** The user's unit system: tool results and replies use it for distances. */
+  units: UnitSystem;
   /** Claims one of the day's escalations; resolves false when none are left. */
   claimSonnet: () => Promise<boolean>;
   today?: Date;
@@ -53,13 +56,21 @@ export async function runAgent(opts: {
 }): Promise<AgentReply> {
   const today = opts.today ?? new Date();
   const client = new Anthropic();
-  const snapshot = opts.signedIn ? await loadHistorySnapshot(today, opts.env) : undefined;
+  const snapshot = opts.signedIn
+    ? await loadHistorySnapshot(today, opts.env, opts.units)
+    : undefined;
   const baseMessages = (): Anthropic.MessageParam[] =>
     opts.history.map((m) => ({ role: m.role, content: m.content }));
 
   const dataTools = opts.signedIn ? SIGNED_IN_TOOLS : [];
   let model: string = CHATBOT_MODEL;
-  let system = buildSystemPrompt({ signedIn: opts.signedIn, today, snapshot, canEscalate: true });
+  let system = buildSystemPrompt({
+    signedIn: opts.signedIn,
+    today,
+    snapshot,
+    canEscalate: true,
+    units: opts.units,
+  });
   let tools: Anthropic.Tool[] | undefined = [...dataTools, ESCALATE_TOOL];
   let messages = baseMessages();
 
@@ -132,7 +143,13 @@ export async function runAgent(opts: {
       );
       escalated = true;
       model = ESCALATION_MODEL;
-      system = buildSystemPrompt({ signedIn: opts.signedIn, today, snapshot, canEscalate: false });
+      system = buildSystemPrompt({
+        signedIn: opts.signedIn,
+        today,
+        snapshot,
+        canEscalate: false,
+        units: opts.units,
+      });
       tools = dataTools.length > 0 ? dataTools : undefined;
       messages = baseMessages();
       // Text the default model already streamed before escalating stays; this continues it.
@@ -153,7 +170,7 @@ export async function runAgent(opts: {
         });
         continue;
       }
-      const outcome = await runTool(call.name, call.input, today, opts.env);
+      const outcome = await runTool(call.name, call.input, today, opts.env, opts.units);
       wrote ||= outcome.wrote === true;
       results.push({
         type: "tool_result",
