@@ -42,7 +42,7 @@ async function ActivityView({ searchParams }: PageProps<"/activity">) {
   const weekProgress = guidelineProgress(
     await getActivities({ from: format(subDays(today, 6), "yyyy-MM-dd"), to: format(today, "yyyy-MM-dd") }),
   );
-  const buckets = bucketActivities(activities, period, "minutes", units);
+  const buckets = bucketActivities(activities, period, "minutes", units, weightKg);
   // Only offer sample data to accounts with no history at all, not for every empty period.
   const showSampleData = all.length === 0 && !(await hasAnyActivity());
 
