@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { ChatEvent } from "@/lib/chatbot/protocol";
 
 interface Message {
   role: "user" | "assistant";
@@ -15,10 +16,14 @@ export default function ChatWidget({ signedIn }: { signedIn: boolean }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages, pending]);
+
+  // Stop an in-flight reply if the user leaves the page.
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -31,22 +36,62 @@ export default function ChatWidget({ signedIn }: { signedIn: boolean }) {
     setError(null);
     setPending(true);
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    // Appends streamed text to the assistant message, creating it on the first chunk.
+    let started = false;
+    const append = (delta: string) => {
+      const isFirst = !started;
+      started = true;
+      setMessages((prev) =>
+        isFirst
+          ? [...prev, { role: "assistant", content: delta }]
+          : prev.map((m, i) =>
+              i === prev.length - 1 ? { ...m, content: m.content + delta } : m,
+            ),
+      );
+    };
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: next }),
+        signal: controller.signal,
       });
-      const data: { reply?: string; error?: string } = await res
-        .json()
-        .catch(() => ({}));
-      if (!res.ok || !data.reply) {
+
+      if (!res.ok || !res.body) {
+        // Rejected before streaming began: a plain JSON { error }.
+        const data: { error?: string } = await res.json().catch(() => ({}));
         setError(data.error ?? "Something went wrong. Please try again.");
-      } else {
-        setMessages([...next, { role: "assistant", content: data.reply }]);
+        return;
       }
+
+      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += value;
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event: ChatEvent = JSON.parse(line);
+          if (event.type === "text") append(event.delta);
+          else if (event.type === "error") setError(event.message);
+        }
+      }
+      if (!started) setError("The assistant didn't reply. Please try again.");
     } catch {
-      setError("Couldn't reach the assistant. Check your connection and try again.");
+      if (!controller.signal.aborted) {
+        setError(
+          started
+            ? "The connection dropped mid-reply. Please try again."
+            : "Couldn't reach the assistant. Check your connection and try again.",
+        );
+      }
     } finally {
       setPending(false);
     }
@@ -74,7 +119,7 @@ export default function ChatWidget({ signedIn }: { signedIn: boolean }) {
             {m.content}
           </p>
         ))}
-        {pending && (
+        {pending && messages[messages.length - 1]?.role === "user" && (
           <p>
             <em>Thinking…</em>
           </p>

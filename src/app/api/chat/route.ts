@@ -1,11 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { runAgent, type ChatTurn } from "@/lib/chatbot/agent";
 import { LIMITS } from "@/lib/chatbot/config";
+import type { ChatEvent } from "@/lib/chatbot/protocol";
 import { allowRequest } from "@/lib/chatbot/rate-limit";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
-function json(body: { reply?: string; error?: string; wrote?: boolean }, status = 200) {
+/** Errors that happen before streaming starts. Success is an NDJSON stream (see protocol.ts). */
+function json(body: { error: string }, status: number) {
   return Response.json(body, { status });
 }
 
@@ -76,18 +78,52 @@ export async function POST(request: Request) {
     );
   }
 
-  try {
-    const { reply, wrote } = await runAgent({ history, signedIn });
-    return json({ reply, wrote });
-  } catch (e) {
-    if (e instanceof Anthropic.RateLimitError) {
-      return json({ error: "The assistant is busy right now. Try again shortly." }, 503);
-    }
-    if (e instanceof Anthropic.AuthenticationError) {
-      console.error("chat: Anthropic rejected the API key");
-      return json({ error: "The assistant isn't set up correctly yet." }, 503);
-    }
-    console.error("chat: request failed", e);
-    return json({ error: "Something went wrong. Please try again." }, 500);
+  // From here on the status is 200 and anything that goes wrong is sent as an "error" event.
+  const encoder = new TextEncoder();
+  let clientGone = false;
+  const events = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (event: ChatEvent) => {
+        if (clientGone) return;
+        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      };
+      try {
+        const { wrote } = await runAgent({
+          history,
+          signedIn,
+          signal: request.signal,
+          onText: (delta) => send({ type: "text", delta }),
+        });
+        send({ type: "done", wrote });
+      } catch (e) {
+        if (!clientGone) send({ type: "error", message: friendlyError(e) });
+      } finally {
+        if (!clientGone) controller.close();
+      }
+    },
+    cancel() {
+      // The browser disconnected; request.signal aborts the model call too.
+      clientGone = true;
+    },
+  });
+
+  return new Response(events, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
+
+function friendlyError(e: unknown): string {
+  if (e instanceof Anthropic.RateLimitError) {
+    return "The assistant is busy right now. Try again shortly.";
   }
+  if (e instanceof Anthropic.AuthenticationError) {
+    console.error("chat: Anthropic rejected the API key");
+    return "The assistant isn't set up correctly yet.";
+  }
+  console.error("chat: request failed", e);
+  return "Something went wrong. Please try again.";
 }
