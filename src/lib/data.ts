@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { ActivityNotFoundError } from "./activity-errors";
 import type {
   Activity,
   ActivityInput,
@@ -8,13 +9,9 @@ import type {
 
 const COLUMNS = "id, date, type, status, duration_min, distance_km, notes";
 
-/** Thrown when a row doesn't exist or isn't visible to the user (RLS). */
-export class ActivityNotFoundError extends Error {
-  constructor() {
-    super("Activity not found.");
-    this.name = "ActivityNotFoundError";
-  }
-}
+// Defined in its own module so code that only needs the error class (the chatbot
+// tools, the eval script) doesn't have to load the Supabase client.
+export { ActivityNotFoundError };
 
 function toRow(input: ActivityInput) {
   return {

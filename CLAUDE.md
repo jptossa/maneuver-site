@@ -20,7 +20,7 @@ npm run lint         # eslint
 npx tsc --noEmit     # typecheck — run `npm run build` (or `npx next typegen`) first, otherwise the global PageProps/LayoutProps types are missing and it errors
 ```
 
-There is no test runner configured yet.
+There is no unit test runner. The only automated behavior checks are the chatbot evals: `npm run eval:chat` (details under "Activity assistant"). It calls the real model, costs a few cents per run, and needs `ANTHROPIC_API_KEY` in `.env`/`.env.local` (loaded by the script itself; don't read those files).
 
 ## Architecture
 
@@ -46,6 +46,8 @@ Pages (`/` landing, `/activity` tracker table, `/charts` graphs) are thin: resol
 **Activity assistant (chatbot)**: `/assistant` page (`ChatWidget`, client) → `POST /api/chat` (`src/app/api/chat/route.ts`) → `runAgent` (`src/lib/chatbot/agent.ts`), a manual tool loop on the Anthropic Messages API (`@anthropic-ai/sdk`, streamed via `client.messages.stream`, model `CHATBOT_MODEL` defaulting to `claude-haiku-5-5`, `effort: "low"`).
 - Everything tunable is in `src/lib/chatbot/config.ts` (model, the fictional escalation rep "Sifu Sensei" + phone, limits). Persona/scope/escalation rules are the system prompt in `prompt.ts`, built per request (it embeds today's date).
 - Logged-out visitors get no tools (suggestions only). Signed-in users (checked with `auth.getClaims()` in the route) get `get_activity_history`, `log_activity`, `plan_activity`, `complete_planned_activity` from `tools.ts`; writes go through `parseActivityInput` + `createActivity` — the same rules and data seam as the forms. The assistant can mark a planned workout done (`completeActivity`, ids are exposed only on planned history entries) but cannot edit/delete.
+- Tools take a `ToolEnv` (`tools.ts`): `{ store, onWrite }`. The app passes `liveEnv` (`live-env.ts`: `data.ts` + `revalidatePath`) from the route; `runAgent` requires it, so it never imports Supabase or `next/cache`.
+- Evals (`scripts/eval-chat/`, run with `npm run eval:chat -- --help`): ~20 scripted conversations (`cases.ts`) against the real model, prompt and tool code, with an in-memory `MemoryStore` (`store.ts`) and a fixed "today" (Wednesday 2026-10-14) so seed data and answers are deterministic. Checks are plain assertions on reply text and on store changes (e.g. "exactly one new entry"), no model judging. Run it after changing `prompt.ts`, the tools, or `CHATBOT_MODEL`; use `--runs 3` to spot flaky cases. Add a case whenever a prompt bug is fixed. `MemoryStore` mimics `data.ts`; keep the two in step.
 - Wire format: a successful `/api/chat` response is NDJSON `ChatEvent`s (`text` deltas, then `done` or `error`; see `src/lib/chatbot/protocol.ts`). Failures before streaming starts (400/429/503) are plain JSON `{ error }` with that status, so `ChatWidget` checks `res.ok` first. Client disconnects abort the model call via `request.signal`.
 - The client keeps only plain-text turns and resends them each request; tool calls/thinking blocks never leave `runAgent`. `ANTHROPIC_API_KEY` is server-only; without it the route answers 503. Rate limiting (`rate-limit.ts`) is in-memory best-effort; the Anthropic console spend limit is the real backstop.
 
