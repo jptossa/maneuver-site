@@ -2,7 +2,13 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { addDays, format, parseISO, subDays } from "date-fns";
 import { revalidatePath } from "next/cache";
 import { parseActivityInput, type RawInput } from "@/lib/activity-input";
-import { createActivity, getActivities } from "@/lib/data";
+import {
+  ActivityNotFoundError,
+  completeActivity,
+  createActivity,
+  getActivities,
+  getActivity,
+} from "@/lib/data";
 import {
   ACTIVITY_TYPES,
   type ActivityStatus,
@@ -68,6 +74,18 @@ export const SIGNED_IN_TOOLS: Anthropic.Tool[] = [
       required: ["date", "type", "duration_min"],
     },
   },
+  {
+    name: "complete_planned_activity",
+    description:
+      "Mark one of the user's planned activities as done, keeping its planned type, duration and distance. Its date stays the same unless it is still in the future, in which case it moves to today. Use the id of a planned entry from the history data; never guess an id.",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "The id of a planned entry." },
+      },
+      required: ["id"],
+    },
+  },
 ];
 
 export interface ToolOutcome {
@@ -122,6 +140,8 @@ async function describeRange(
     showingMostRecent: recent.length,
     totalsByStatusAndType: byType,
     activities: recent.map((a) => ({
+      // Only planned entries expose an id: it is what complete_planned_activity takes.
+      ...(a.status === "planned" && { id: a.id }),
       date: a.date,
       // Computed here: models are unreliable at date -> weekday arithmetic.
       weekday: format(parseISO(a.date), "EEEE"),
@@ -178,6 +198,38 @@ async function write(
   };
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function complete(
+  input: Record<string, unknown>,
+  today: Date,
+): Promise<ToolOutcome> {
+  const id = asString(input.id);
+  // Checked here so a made-up id is a clean error, not a database type error.
+  if (!UUID.test(id)) {
+    return fail("id must be the id of a planned entry from the history data.");
+  }
+
+  try {
+    const planned = await getActivity(id);
+    if (!planned || planned.status !== "planned") throw new ActivityNotFoundError();
+    const date = await completeActivity(id, format(today, "yyyy-MM-dd"));
+    revalidatePath("/activity");
+    revalidatePath("/charts");
+    return {
+      content: `Marked done: ${planned.type}, ${planned.durationMin} min${planned.distanceKm !== null ? `, ${planned.distanceKm} km` : ""}, now recorded on ${date} (${format(parseISO(date), "EEEE")}).`,
+      wrote: true,
+    };
+  } catch (e) {
+    if (e instanceof ActivityNotFoundError) {
+      return fail(
+        "No planned activity with that id. It may already be completed or deleted.",
+      );
+    }
+    throw e;
+  }
+}
+
 /** Runs one tool call from the model. Never throws for bad input; errors go back to the model. */
 export async function runTool(
   name: string,
@@ -196,6 +248,8 @@ export async function runTool(
         return await write("completed", args, today);
       case "plan_activity":
         return await write("planned", args, today);
+      case "complete_planned_activity":
+        return await complete(args, today);
       default:
         return fail(`Unknown tool: ${name}`);
     }
