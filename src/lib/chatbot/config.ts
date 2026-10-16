@@ -31,6 +31,10 @@ export const LIMITS = {
   maxToolRounds: 6,
   /** Activity rows returned to the model by one history lookup. */
   historyRows: 100,
+  /** Days of forecast the weather tool returns (two 12-hour periods per day). */
+  forecastDays: { default: 4, max: 7 },
+  /** Trail search radius in km: used when the model passes none, and the most it can ask for. */
+  trailRadiusKm: { default: 25, max: 50 },
   /** Requests allowed per window, per caller. */
   requestsPerWindow: { anonymous: 15, signedIn: 40 },
   windowMs: 10 * 60 * 1000,

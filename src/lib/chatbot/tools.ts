@@ -11,11 +11,25 @@ import {
   type Activity,
   type ActivityStatus,
 } from "@/lib/types";
+import type { HomeLocation } from "@/lib/location";
+import {
+  OutdoorsUnavailableError,
+  TRAIL_KINDS,
+  type RawForecast,
+  type RawTrail,
+  type TrailKind,
+} from "@/lib/outdoors/types";
 import {
   displayDistance,
+  displayToKm,
   distanceUnit,
+  fahrenheitToDisplay,
   formatDistance,
+  KM_PER_MILE,
   parseDistanceUnit,
+  speedUnit,
+  temperatureUnit,
+  windToDisplay,
   type UnitSystem,
 } from "@/lib/units";
 import { LIMITS } from "./config";
@@ -97,6 +111,36 @@ export const SIGNED_IN_TOOLS: Anthropic.Tool[] = [
       required: ["id"],
     },
   },
+  {
+    name: "get_weather_forecast",
+    description:
+      "Get the weather forecast (US National Weather Service) for the user's saved home location: 12-hour periods with temperature, chance of precipitation, wind and a short summary, plus any active weather alerts. Use it when they are choosing or timing an outdoor activity. Values are already in their units; never convert.",
+    input_schema: {
+      type: "object",
+      properties: {
+        days: {
+          type: "integer",
+          description: `How many days ahead, 1 to ${LIMITS.forecastDays.max}. Defaults to ${LIMITS.forecastDays.default}.`,
+        },
+      },
+    },
+  },
+  {
+    name: "find_trails",
+    description:
+      "Find named trails, paths and parks near the user's saved home location (OpenStreetMap). Returns names with type, distance from home and sometimes length or difficulty. It has no ratings, elevation or current conditions. Distances are already in the user's units; never convert.",
+    input_schema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: [...TRAIL_KINDS] },
+        radius: {
+          type: "number",
+          description: `Search radius in the user's distance unit. Defaults to ${LIMITS.trailRadiusKm.default} km (about ${Math.round(LIMITS.trailRadiusKm.default / KM_PER_MILE)} mi), at most ${LIMITS.trailRadiusKm.max} km. Omit unless the user asks for a different distance.`,
+        },
+      },
+      required: ["kind"],
+    },
+  },
 ];
 
 /**
@@ -109,8 +153,30 @@ export interface ToolEnv {
     typeof data,
     "getActivities" | "getActivity" | "createActivity" | "completeActivity"
   >;
+  /** Weather and trail providers. Raw provider data comes back; the tools convert it to the user's units. */
+  outdoors: {
+    getForecast: (loc: HomeLocation, signal?: AbortSignal) => Promise<RawForecast>;
+    searchTrails: (
+      loc: HomeLocation,
+      kind: TrailKind,
+      radiusKm: number,
+      signal?: AbortSignal,
+    ) => Promise<RawTrail[]>;
+  };
   /** Called after any write, e.g. to refresh cached pages. */
   onWrite: () => void;
+}
+
+/** Everything a tool call needs beyond its own input. */
+export interface ToolContext {
+  today: Date;
+  env: ToolEnv;
+  units: UnitSystem;
+  weightKg: number | null;
+  /** The user's saved home location, or null when they haven't set one. */
+  location: HomeLocation | null;
+  /** Aborts provider calls, e.g. when the browser disconnects. */
+  signal?: AbortSignal;
 }
 
 export interface ToolOutcome {
@@ -316,15 +382,102 @@ async function complete(
   }
 }
 
+const NO_LOCATION =
+  "The user hasn't saved a home location, so there is nothing to look up. Tell them to enter a US city or ZIP code in the Location box in the header of the site and ask again. Do not guess the weather or name trails.";
+
+function clampInt(v: unknown, min: number, max: number, fallback: number): number {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+}
+
+async function forecast(
+  ctx: ToolContext,
+  input: Record<string, unknown>,
+): Promise<ToolOutcome> {
+  if (!ctx.location) return fail(NO_LOCATION);
+  const days = clampInt(input.days, 1, LIMITS.forecastDays.max, LIMITS.forecastDays.default);
+  const raw = await ctx.env.outdoors.getForecast(ctx.location, ctx.signal);
+  const { units } = ctx;
+  return {
+    content: JSON.stringify({
+      location: ctx.location.label,
+      source: "US National Weather Service",
+      temperatureUnit: temperatureUnit(units),
+      windUnit: speedUnit(units),
+      // Two 12-hour periods (day and night) per day, starting with the current one.
+      periods: raw.periods.slice(0, days * 2).map((p) => ({
+        name: p.name,
+        date: p.date,
+        // Computed here: models are unreliable at date -> weekday arithmetic.
+        weekday: format(parseISO(p.date), "EEEE"),
+        // Daytime periods report the high, night periods the low.
+        temperatureIs: p.isDaytime ? "high" : "low",
+        temperature: fahrenheitToDisplay(p.temperatureF, units),
+        chanceOfPrecipitationPercent: p.precipChance,
+        wind: windToDisplay(p.windText, units),
+        summary: p.summary,
+      })),
+      // "unavailable" means the alert lookup failed: say alerts couldn't be checked.
+      alerts:
+        raw.alerts === null
+          ? "unavailable"
+          : raw.alerts.map((a) => ({
+              event: a.event,
+              severity: a.severity,
+              headline: a.headline,
+              ends: a.ends,
+            })),
+    }),
+  };
+}
+
+async function trails(
+  ctx: ToolContext,
+  input: Record<string, unknown>,
+): Promise<ToolOutcome> {
+  if (!ctx.location) return fail(NO_LOCATION);
+  const kind = TRAIL_KINDS.find((k) => k === input.kind);
+  if (!kind) return fail(`kind must be one of: ${TRAIL_KINDS.join(", ")}.`);
+
+  // The radius is given in the user's unit; the cap and default are in km.
+  const unit = distanceUnit(ctx.units);
+  const typed = Number(input.radius);
+  const radiusKm =
+    input.radius !== undefined && Number.isFinite(typed) && typed > 0
+      ? Math.min(LIMITS.trailRadiusKm.max, displayToKm(typed, unit))
+      : LIMITS.trailRadiusKm.default;
+
+  const found = await ctx.env.outdoors.searchTrails(ctx.location, kind, radiusKm, ctx.signal);
+  return {
+    content: JSON.stringify({
+      location: ctx.location.label,
+      kind,
+      searchRadius: displayDistance(radiusKm, ctx.units),
+      distanceUnit: unit,
+      count: found.length,
+      trails: found.map((t) => ({
+        name: t.name,
+        type: t.kind === "route" ? `${t.routeType ?? "trail"} route` : "park or nature reserve",
+        ...(t.network && { network: t.network }),
+        ...(t.operator && { operator: t.operator }),
+        // Only present when the map data tags a length; never estimate one.
+        ...(t.lengthKm !== null && { length: displayDistance(t.lengthKm, ctx.units) }),
+        fromHome: displayDistance(t.fromHomeKm, ctx.units),
+        ...(t.sacScale && { difficultyTag: t.sacScale }),
+      })),
+      note: "Volunteer-mapped data: names are free text, and there are no ratings, elevation, or current conditions. An empty or short list means sparse map coverage, not that nothing exists.",
+      attribution: "Trail data (c) OpenStreetMap contributors",
+    }),
+  };
+}
+
 /** Runs one tool call from the model. Never throws for bad input; errors go back to the model. */
 export async function runTool(
   name: string,
   input: unknown,
-  today: Date,
-  env: ToolEnv,
-  units: UnitSystem,
-  weightKg: number | null,
+  ctx: ToolContext,
 ): Promise<ToolOutcome> {
+  const { env, today, units, weightKg } = ctx;
   const args =
     typeof input === "object" && input !== null
       ? (input as Record<string, unknown>)
@@ -339,10 +492,18 @@ export async function runTool(
         return await write(env, "planned", args, today, units);
       case "complete_planned_activity":
         return await complete(env, args, today, units);
+      case "get_weather_forecast":
+        return await forecast(ctx, args);
+      case "find_trails":
+        return await trails(ctx, args);
       default:
         return fail(`Unknown tool: ${name}`);
     }
   } catch (e) {
+    // A provider outage or an out-of-coverage place: the message is written for the model to relay.
+    if (e instanceof OutdoorsUnavailableError) {
+      return fail(`${e.message} Tell the user this isn't available right now; do not guess.`);
+    }
     console.error(`chatbot tool ${name} failed`, e);
     return fail("That didn't work on our end. Please try again in a moment.");
   }

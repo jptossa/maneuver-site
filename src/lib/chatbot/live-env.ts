@@ -1,5 +1,7 @@
 import { revalidatePath } from "next/cache";
 import * as data from "@/lib/data";
+import { fetchForecast } from "@/lib/outdoors/nws";
+import { fetchTrails } from "@/lib/outdoors/overpass";
 import { createClient } from "@/lib/supabase/server";
 import { LIMITS } from "./config";
 import type { ToolEnv } from "./tools";
@@ -7,6 +9,7 @@ import type { ToolEnv } from "./tools";
 /** The real environment: the signed-in user's Supabase data, with cached pages refreshed after writes. */
 export const liveEnv: ToolEnv = {
   store: data,
+  outdoors: { getForecast: fetchForecast, searchTrails: fetchTrails },
   onWrite() {
     revalidatePath("/activity");
     revalidatePath("/charts");

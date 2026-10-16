@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { addDays, format } from "date-fns";
 import { ActivityNotFoundError } from "@/lib/activity-errors";
 import type { ToolEnv } from "@/lib/chatbot/tools";
+import type { TrailKind } from "@/lib/outdoors/types";
+import { defaultOutdoors, unavailable, type FakeOutdoors } from "./outdoors-fixtures";
 import type {
   Activity,
   ActivityInput,
@@ -25,9 +27,16 @@ export const dayOffset = (n: number) => iso(addDays(TODAY, n));
  */
 export class MemoryStore {
   rows: Activity[];
+  /** How often the assistant asked the fake weather and trail providers. */
+  calls = { forecast: 0, trails: 0 };
+  /** Every trail search the assistant made, with its radius in km. */
+  trailQueries: { kind: TrailKind; radiusKm: number }[] = [];
 
-  constructor(rows: Activity[]) {
+  private outdoors: FakeOutdoors;
+
+  constructor(rows: Activity[], outdoors?: FakeOutdoors) {
     this.rows = rows.map((r) => ({ ...r }));
+    this.outdoors = outdoors ?? defaultOutdoors();
   }
 
   snapshot(): Activity[] {
@@ -70,6 +79,19 @@ export class MemoryStore {
           if (row.date > todayIso) row.date = todayIso;
           row.status = "completed";
           return row.date;
+        },
+      },
+      outdoors: {
+        getForecast: async () => {
+          this.calls.forecast++;
+          if (this.outdoors.forecast === "fail") throw unavailable();
+          return this.outdoors.forecast;
+        },
+        searchTrails: async (_loc, kind, radiusKm) => {
+          this.calls.trails++;
+          this.trailQueries.push({ kind, radiusKm });
+          if (this.outdoors.trails === "fail") throw unavailable();
+          return this.outdoors.trails;
         },
       },
       onWrite: () => {},

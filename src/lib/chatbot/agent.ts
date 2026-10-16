@@ -6,6 +6,7 @@ import {
   REPRESENTATIVE,
 } from "./config";
 import { ESCALATE_TOOL, ESCALATE_TOOL_NAME } from "./escalation";
+import type { HomeLocation } from "@/lib/location";
 import type { UnitSystem } from "@/lib/units";
 import { buildSystemPrompt } from "./prompt";
 import { SIGNED_IN_TOOLS, loadHistorySnapshot, runTool, type ToolEnv } from "./tools";
@@ -49,6 +50,8 @@ export async function runAgent(opts: {
   units: UnitSystem;
   /** Body weight in kg for calorie estimates; null when the user hasn't set it. */
   weightKg: number | null;
+  /** Home location for weather and trail lookups; null when the user hasn't saved one. */
+  location: HomeLocation | null;
   /** Claims one of the day's escalations; resolves false when none are left. */
   claimSonnet: () => Promise<boolean>;
   today?: Date;
@@ -72,6 +75,7 @@ export async function runAgent(opts: {
     snapshot,
     canEscalate: true,
     units: opts.units,
+    locationLabel: opts.location?.label ?? null,
   });
   let tools: Anthropic.Tool[] | undefined = [...dataTools, ESCALATE_TOOL];
   let messages = baseMessages();
@@ -151,6 +155,7 @@ export async function runAgent(opts: {
         snapshot,
         canEscalate: false,
         units: opts.units,
+        locationLabel: opts.location?.label ?? null,
       });
       tools = dataTools.length > 0 ? dataTools : undefined;
       messages = baseMessages();
@@ -172,7 +177,14 @@ export async function runAgent(opts: {
         });
         continue;
       }
-      const outcome = await runTool(call.name, call.input, today, opts.env, opts.units, opts.weightKg);
+      const outcome = await runTool(call.name, call.input, {
+        today,
+        env: opts.env,
+        units: opts.units,
+        weightKg: opts.weightKg,
+        location: opts.location,
+        signal: opts.signal,
+      });
       wrote ||= outcome.wrote === true;
       results.push({
         type: "tool_result",

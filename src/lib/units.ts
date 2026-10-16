@@ -52,6 +52,33 @@ export function displayDistance(km: number, units: UnitSystem): number {
   return round(kmToDisplay(km, units), 1);
 }
 
+// Weather arrives from the National Weather Service in Fahrenheit and mph; the user's
+// unit system decides what the assistant reports.
+
+export type TemperatureUnit = "F" | "C";
+export type SpeedUnit = "mph" | "km/h";
+
+export function temperatureUnit(units: UnitSystem): TemperatureUnit {
+  return units === "us" ? "F" : "C";
+}
+
+export function speedUnit(units: UnitSystem): SpeedUnit {
+  return units === "us" ? "mph" : "km/h";
+}
+
+/** Whole degrees in the user's unit. */
+export function fahrenheitToDisplay(f: number, units: UnitSystem): number {
+  return units === "us" ? Math.round(f) : Math.round(((f - 32) * 5) / 9);
+}
+
+/** Converts an NWS wind string in mph ("5 mph", "5 to 10 mph") to the user's unit. */
+export function windToDisplay(mphText: string, units: UnitSystem): string {
+  if (units === "us") return mphText;
+  return mphText
+    .replace(/\d+/g, (n) => String(Math.round(Number(n) * KM_PER_MILE)))
+    .replace(/\bmph\b/i, "km/h");
+}
+
 // Body weight (for calorie estimates) is stored in kilograms in user_metadata.weightKg.
 
 export type WeightUnit = "lb" | "kg";
