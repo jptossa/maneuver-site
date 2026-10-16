@@ -114,7 +114,11 @@ export default function ChatWidget({ signedIn }: { signedIn: boolean }) {
           </p>
         )}
         {messages.map((m, i) => (
-          <p key={i} style={{ whiteSpace: "pre-wrap" }}>
+          <p
+            key={i}
+            className={`message ${m.role}`}
+            style={{ whiteSpace: "pre-wrap" }}
+          >
             <strong>{m.role === "user" ? "You" : "Maneuver"}:</strong>{" "}
             {m.content}
           </p>

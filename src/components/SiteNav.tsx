@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import AuthStatus from "./AuthStatus";
+import ThemeToggle from "./ThemeToggle";
 
 export default function SiteNav() {
   return (
     <nav aria-label="Main">
-      <Link href="/">
-        <strong>Maneuver</strong>
+      <Link href="/" className="wordmark">
+        Maneuver
       </Link>
       <div>
         <ul>
@@ -24,6 +25,9 @@ export default function SiteNav() {
             <Suspense fallback={null}>
               <AuthStatus />
             </Suspense>
+          </li>
+          <li>
+            <ThemeToggle />
           </li>
         </ul>
       </div>

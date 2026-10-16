@@ -11,6 +11,15 @@ import {
   YAxis,
 } from "recharts";
 import type { ChartSeries } from "@/lib/chart-colors";
+import {
+  AXIS_LINE,
+  AXIS_TICK,
+  GRID_STROKE,
+  LEGEND_STYLE,
+  TOOLTIP_CONTENT,
+  TOOLTIP_ITEM,
+  TOOLTIP_LABEL,
+} from "./chart-theme";
 
 /** One bar: its x-axis label plus a value per series key. */
 export type BarRow = { label: string } & Record<string, number | string>;
@@ -30,11 +39,28 @@ export default function ActivityBarChart({
     <div style={{ width: "100%", height: 360 }}>
       <ResponsiveContainer>
         <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="label" interval="preserveStartEnd" />
-          <YAxis unit={unit ? ` ${unit}` : undefined} width={70} />
-          <Tooltip />
-          <Legend />
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+          <XAxis
+            dataKey="label"
+            interval="preserveStartEnd"
+            tick={AXIS_TICK}
+            axisLine={AXIS_LINE}
+            tickLine={AXIS_LINE}
+          />
+          <YAxis
+            unit={unit ? ` ${unit}` : undefined}
+            width={70}
+            tick={AXIS_TICK}
+            axisLine={AXIS_LINE}
+            tickLine={AXIS_LINE}
+          />
+          <Tooltip
+            contentStyle={TOOLTIP_CONTENT}
+            labelStyle={TOOLTIP_LABEL}
+            itemStyle={TOOLTIP_ITEM}
+            cursor={{ fill: "var(--chart-cursor)" }}
+          />
+          <Legend wrapperStyle={LEGEND_STYLE} />
           {active.map((s) => (
             <Bar
               key={s.key}

@@ -6,18 +6,21 @@ import {
 } from "./activity-catalog";
 import { ACTIVITY_TYPES, type ActivityType } from "./types";
 
-// Placeholder palette; revisit with the styling pass.
+// Muted "Warrior" palette: crimson, teal, brass, purple, jade, steel, plum.
 // One hue per group, lightness stepped within the group, so ~30 types stay
 // legible in stacked bars and the pie legend (types in a group read as related).
+// Lightness spans 35–70% so the colors work on both the dark and light themes.
 const GROUP_HUES: Record<ActivityGroup, number> = {
-  Cardio: 210,
-  Water: 175,
-  Strength: 20,
-  "Mind & body": 45,
-  Sports: 130,
-  Winter: 270,
-  Everyday: 330,
+  Cardio: 355,
+  Water: 185,
+  Strength: 38,
+  "Mind & body": 275,
+  Sports: 150,
+  Winter: 215,
+  Everyday: 320,
 };
+
+const SATURATION = 52;
 
 function buildColors(): Record<ActivityType, string> {
   const colors = {} as Record<ActivityType, string>;
@@ -28,7 +31,7 @@ function buildColors(): Record<ActivityType, string> {
     members.forEach((t, i) => {
       // Spread lightness 35%..70% across the group's members.
       const l = members.length === 1 ? 52 : 35 + (35 * i) / (members.length - 1);
-      colors[t] = `hsl(${GROUP_HUES[group]} 65% ${Math.round(l)}%)`;
+      colors[t] = `hsl(${GROUP_HUES[group]} ${SATURATION}% ${Math.round(l)}%)`;
     });
   }
   return colors;
@@ -38,7 +41,7 @@ export const TYPE_COLORS: Record<ActivityType, string> = buildColors();
 
 /** Mid-lightness group hue, used when the charts are rolled up by group. */
 export const GROUP_COLORS: Record<ActivityGroup, string> = Object.fromEntries(
-  ACTIVITY_GROUPS.map((g) => [g, `hsl(${GROUP_HUES[g]} 65% 52%)`]),
+  ACTIVITY_GROUPS.map((g) => [g, `hsl(${GROUP_HUES[g]} ${SATURATION}% 52%)`]),
 ) as Record<ActivityGroup, string>;
 
 /** One chart series: `key` is the data key in chart rows. */
