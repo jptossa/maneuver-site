@@ -19,13 +19,19 @@ import {
   type Period,
   type Summary,
 } from "./types";
+import { kmToDisplay, type UnitSystem } from "./units";
 
-export function metricValue(a: Activity, metric: Metric): number {
+/** Value of metric for one activity. Distance is returned in the user's display unit (storage is km). */
+export function metricValue(
+  a: Activity,
+  metric: Metric,
+  units: UnitSystem,
+): number {
   switch (metric) {
     case "minutes":
       return a.durationMin;
     case "distance":
-      return a.distanceKm ?? 0;
+      return kmToDisplay(a.distanceKm ?? 0, units);
     case "sessions":
       return 1;
   }
@@ -49,12 +55,13 @@ function makeBucket(
   end: string,
   items: Activity[],
   metric: Metric,
+  units: UnitSystem,
 ): Bucket {
   const byType = emptyByType();
   let totalMin = 0;
   let totalKm = 0;
   for (const a of items) {
-    byType[a.type] = round1(byType[a.type] + metricValue(a, metric));
+    byType[a.type] = round1(byType[a.type] + metricValue(a, metric, units));
     totalMin += a.durationMin;
     totalKm += a.distanceKm ?? 0;
   }
@@ -81,13 +88,14 @@ export function bucketActivities(
   activities: Activity[],
   period: Period,
   metric: Metric,
+  units: UnitSystem,
 ): Bucket[] {
   const start = parseISO(period.start);
   const end = parseISO(period.end);
 
   if (period.scale === "day") {
     return activities.map((a) =>
-      makeBucket(a.id, activityLabel(a.type), a.date, a.date, [a], metric),
+      makeBucket(a.id, activityLabel(a.type), a.date, a.date, [a], metric, units),
     );
   }
 
@@ -102,6 +110,7 @@ export function bucketActivities(
         `${key}-31`,
         items,
         metric,
+        units,
       );
     });
   }
@@ -110,7 +119,7 @@ export function bucketActivities(
   return eachDayOfInterval({ start, end }).map((d) => {
     const iso = format(d, "yyyy-MM-dd");
     const items = activities.filter((a) => a.date === iso);
-    return makeBucket(iso, format(d, labelFmt), iso, iso, items, metric);
+    return makeBucket(iso, format(d, labelFmt), iso, iso, items, metric, units);
   });
 }
 
@@ -126,10 +135,11 @@ export function summarize(activities: Activity[]): Summary {
 export function totalsByType(
   activities: Activity[],
   metric: Metric,
+  units: UnitSystem,
 ): { type: ActivityType; value: number }[] {
   const byType = emptyByType();
   for (const a of activities) {
-    byType[a.type] = round1(byType[a.type] + metricValue(a, metric));
+    byType[a.type] = round1(byType[a.type] + metricValue(a, metric, units));
   }
   return ACTIVITY_TYPES.map((type) => ({ type, value: byType[type] })).filter(
     (t) => t.value > 0,
@@ -154,10 +164,11 @@ export function rollUpByGroup(
 export function totalsByGroup(
   activities: Activity[],
   metric: Metric,
+  units: UnitSystem,
 ): { group: ActivityGroup; value: number }[] {
   const byType = emptyByType();
   for (const a of activities) {
-    byType[a.type] = round1(byType[a.type] + metricValue(a, metric));
+    byType[a.type] = round1(byType[a.type] + metricValue(a, metric, units));
   }
   const byGroup = rollUpByGroup(byType);
   return ACTIVITY_GROUPS.map((group) => ({ group, value: byGroup[group] })).filter(

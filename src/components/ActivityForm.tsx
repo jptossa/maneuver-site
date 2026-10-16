@@ -8,6 +8,7 @@ import type {
   RawInput,
 } from "@/lib/activity-input";
 import { activityLabel, typesByGroup } from "@/lib/activity-catalog";
+import { distanceUnitName, type DistanceUnit } from "@/lib/units";
 
 export default function ActivityForm({
   action,
@@ -16,6 +17,7 @@ export default function ActivityForm({
   maxDate,
   cancelHref,
   submitLabel,
+  unit,
 }: {
   action: (
     prev: ActivityFormState,
@@ -28,6 +30,8 @@ export default function ActivityForm({
   maxDate?: string;
   cancelHref: string;
   submitLabel: string;
+  /** Unit the distance field is typed in (the user's preference). */
+  unit: DistanceUnit;
 }) {
   const [state, formAction, pending] = useActionState(action, null);
   // After a failed submit, show what the user typed rather than the initial values.
@@ -47,6 +51,8 @@ export default function ActivityForm({
   return (
     <form action={formAction}>
       {state?.message && <p role="alert">{state.message}</p>}
+      {/* The unit this form was rendered in, so a preference change in another tab can't reinterpret the number. */}
+      <input type="hidden" name="distanceUnit" value={unit} />
       <p>
         <label>
           Date{" "}
@@ -109,19 +115,19 @@ export default function ActivityForm({
       </p>
       <p>
         <label>
-          Distance (km, optional){" "}
+          Distance ({distanceUnitName(unit)}, optional){" "}
           <input
             type="number"
-            name="distanceKm"
+            name="distance"
             min={0}
             step="any"
             inputMode="decimal"
-            defaultValue={values.distanceKm ?? ""}
-            aria-invalid={!!errors.distanceKm}
-            aria-describedby={describedBy("distanceKm")}
+            defaultValue={values.distance ?? ""}
+            aria-invalid={!!errors.distance}
+            aria-describedby={describedBy("distance")}
           />
         </label>
-        {error("distanceKm")}
+        {error("distance")}
       </p>
       <p>
         <label>

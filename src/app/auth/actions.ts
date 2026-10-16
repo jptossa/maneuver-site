@@ -1,8 +1,10 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { safeNext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { parseUnits } from "@/lib/units";
 
 function field(formData: FormData, name: string) {
   const v = formData.get(name);
@@ -43,6 +45,22 @@ export async function signup(formData: FormData) {
   if (!data.session) redirect("/signup?check-email=1");
 
   redirect(next);
+}
+
+/** Saves the unit system on the account (`user_metadata.units`). */
+export async function setUnits(formData: FormData) {
+  const units = parseUnits(formData.get("units"));
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  if (!data?.claims) redirect("/login");
+
+  const { error } = await supabase.auth.updateUser({ data: { units } });
+  if (error) throw new Error(`Failed to save units: ${error.message}`);
+  // getUnits() reads user_metadata from the JWT, which is stale until the session
+  // is refreshed, so refresh now to make the new preference visible immediately.
+  await supabase.auth.refreshSession();
+
+  revalidatePath("/", "layout");
 }
 
 export async function signout() {

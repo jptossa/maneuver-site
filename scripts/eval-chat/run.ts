@@ -70,6 +70,7 @@ async function runCase(c: Case): Promise<Outcome> {
         history,
         signedIn: c.signedIn,
         env: store.env(),
+        units: c.units ?? "us",
         claimSonnet,
         today: TODAY,
       });

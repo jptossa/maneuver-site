@@ -5,12 +5,13 @@ import {
   type ActivityStatus,
   type ActivityType,
 } from "./types";
+import { displayToKm, KM_PER_MILE, type DistanceUnit } from "./units";
 
 export const FIELDS = [
   "date",
   "type",
   "durationMin",
-  "distanceKm",
+  "distance",
   "notes",
 ] as const;
 export type Field = (typeof FIELDS)[number];
@@ -47,11 +48,13 @@ export function formDataToRaw(formData: FormData): RawInput {
 /**
  * Validates user-supplied activity fields. `status` comes from the caller, not
  * the form: completed dates may not be after `today`, planned dates may not be before it.
+ * `unit` is the unit `raw.distance` was typed in; the result's `distanceKm` is always km.
  */
 export function parseActivityInput(
   raw: RawInput,
   today: Date,
   status: ActivityStatus,
+  unit: DistanceUnit,
 ): ParseResult {
   const errors: FieldErrors = {};
 
@@ -77,14 +80,19 @@ export function parseActivityInput(
     errors.durationMin = `Enter whole minutes between 1 and ${MAX_DURATION_MIN}.`;
   }
 
-  const distanceStr = (raw.distanceKm ?? "").trim();
+  // The user types distance in `unit`; it's stored in km.
+  const distanceStr = (raw.distance ?? "").trim();
   let distanceKm: number | null = null;
   if (distanceStr !== "") {
     const n = Number(distanceStr);
-    if (!Number.isFinite(n) || n < 0 || n > MAX_DISTANCE_KM) {
-      errors.distanceKm = `Enter a distance between 0 and ${MAX_DISTANCE_KM} km, or leave it blank.`;
+    const km = displayToKm(n, unit);
+    if (!Number.isFinite(n) || n < 0 || km > MAX_DISTANCE_KM) {
+      const max = Math.floor(
+        unit === "mi" ? MAX_DISTANCE_KM / KM_PER_MILE : MAX_DISTANCE_KM,
+      );
+      errors.distance = `Enter a distance between 0 and ${max.toLocaleString("en-US")} ${unit}, or leave it blank.`;
     } else {
-      distanceKm = Math.round(n * 100) / 100;
+      distanceKm = km;
     }
   }
 

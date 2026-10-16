@@ -7,13 +7,16 @@ import DeleteActivityButton from "@/components/DeleteActivityButton";
 import { activityLabel } from "@/lib/activity-catalog";
 import { formatDuration } from "@/lib/aggregate";
 import type { Activity } from "@/lib/types";
+import { formatDistance, type UnitSystem } from "@/lib/units";
 
 /** Planned workouts in the viewed period. Renders nothing when there are none. */
 export default function PlannedList({
   planned,
   todayIso,
+  units,
 }: {
   planned: Activity[];
+  units: UnitSystem;
   /** Today, yyyy-MM-dd — plans dated before it are shown as overdue */
   todayIso: string;
 }) {
@@ -44,7 +47,11 @@ export default function PlannedList({
               </td>
               <td>{activityLabel(a.type)}</td>
               <td>{formatDuration(a.durationMin)}</td>
-              <td>{a.distanceKm === null ? "—" : `${a.distanceKm} km`}</td>
+              <td>
+                {a.distanceKm === null
+                  ? "—"
+                  : formatDistance(a.distanceKm, units)}
+              </td>
               <td>{a.notes ?? ""}</td>
               <td>
                 <form action={completeActivityAction.bind(null, a.id)}>
