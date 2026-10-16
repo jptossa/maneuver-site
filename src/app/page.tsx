@@ -5,36 +5,36 @@ import heroPhoto from "@/assets/hero.jpg";
 const benefits = [
   {
     title: "Every kind of movement counts",
-    body: "Workouts, bike commutes, weekend hikes, walks to the shop — Maneuver captures all of it, not just gym sessions.",
+    body: "Workouts, bike commutes, weekend hikes, walks to the shop — Maneuver captures all of it, not just gym sessions. Yes, even the sprint for the bus.",
   },
   {
     title: "See the bigger picture",
-    body: "Look at your activity by day, week, month or year to spot patterns and trends instead of guessing.",
+    body: "Look at your activity by day, week, month or year to spot patterns and trends instead of guessing. Your memory of \"I basically train every day\" is about to meet the data.",
   },
   {
     title: "Stay motivated",
-    body: "Clear totals and charts make progress visible, so it is easier to keep a habit going.",
+    body: "Clear totals and charts make progress visible, so it is easier to keep a habit going. Discipline is easier when someone is keeping score, and that someone is a bar chart.",
   },
   {
     title: "One place for everything",
-    body: "Stop juggling apps and notebooks. Keep your whole movement history together.",
+    body: "Stop juggling apps and notebooks. Keep your whole movement history together, with no \"how was your workout?\" survey at the end.",
   },
 ];
 
 const services = [
   {
     title: "Activity tracking",
-    body: "Log activities and review them across daily, weekly, monthly and yearly views.",
+    body: "Log activities and review them across daily, weekly, monthly and yearly views. Plan the workout, then do the workout. We can only help with the first part.",
     href: "/activity",
   },
   {
     title: "Charts & insights",
-    body: "Graph your time, distance and sessions, and see how your activity types stack up.",
+    body: "Graph your time, distance and sessions, and see how your activity types stack up. The numbers are honest; we just make them look good.",
     href: "/charts",
   },
   {
     title: "Activity assistant",
-    body: "Chat with an assistant that suggests activities you might enjoy. With an account it can also learn from your history and help you log or plan what you do.",
+    body: "Chat with an assistant that suggests activities you might enjoy. With an account it can also learn from your history and help you log or plan what you do. It will not judge your rest days. Much.",
     href: "/assistant",
   },
 ];
@@ -62,7 +62,8 @@ export default function Home() {
           <h1>Move more. Notice more.</h1>
           <p>
             Our mission is to make everyday movement visible and rewarding, so
-            anyone can build a more active life — one maneuver at a time.
+            anyone can build a more active life — one maneuver at a time. Train
+            seriously. Take yourself a little less seriously.
           </p>
           <p className="cta">
             <Link href="/signup" className="button">

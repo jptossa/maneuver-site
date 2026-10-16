@@ -99,7 +99,10 @@ async function ChartsView({ searchParams }: PageProps<"/charts">) {
         calories={totalCalories(activities, weightKg)}
       />
       {activities.length === 0 ? (
-        <p>No activity recorded for this period.</p>
+        <p>
+          No activity recorded for this period. A blank chart is still honest,
+          just not very exciting.
+        </p>
       ) : metric === "calories" && weightKg === null ? (
         <p>Enter your weight in the header to chart estimated calories.</p>
       ) : (
@@ -122,7 +125,7 @@ export default function ChartsPage(props: PageProps<"/charts">) {
   return (
     <>
       <h1>Charts</h1>
-      <Suspense fallback={<p>Loading charts…</p>}>
+      <Suspense fallback={<p>Drawing the charts…</p>}>
         <ChartsView {...props} />
       </Suspense>
     </>

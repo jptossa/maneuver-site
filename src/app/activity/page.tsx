@@ -94,7 +94,8 @@ async function ActivityView({ searchParams }: PageProps<"/activity">) {
         <form action={loadSampleData}>
           <p>
             You haven&apos;t logged any activity yet. Want to see how Maneuver
-            looks with some sample data?
+            looks with some sample data? It&apos;s fictional, but impressively
+            consistent.
           </p>
           <button type="submit">Load sample data</button>
         </form>
@@ -107,7 +108,7 @@ export default function ActivityPage(props: PageProps<"/activity">) {
   return (
     <>
       <h1>Activity</h1>
-      <Suspense fallback={<p>Loading activity…</p>}>
+      <Suspense fallback={<p>Warming up…</p>}>
         <ActivityView {...props} />
       </Suspense>
     </>
