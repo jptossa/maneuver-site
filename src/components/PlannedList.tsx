@@ -6,6 +6,7 @@ import {
 import DeleteActivityButton from "@/components/DeleteActivityButton";
 import { activityLabel } from "@/lib/activity-catalog";
 import { formatDuration } from "@/lib/aggregate";
+import { estimateCalories, formatCalories } from "@/lib/calories";
 import type { Activity } from "@/lib/types";
 import { formatDistance, type UnitSystem } from "@/lib/units";
 
@@ -14,9 +15,12 @@ export default function PlannedList({
   planned,
   todayIso,
   units,
+  weightKg,
 }: {
   planned: Activity[];
   units: UnitSystem;
+  /** For calorie estimates; null when the user hasn't set it. */
+  weightKg: number | null;
   /** Today, yyyy-MM-dd — plans dated before it are shown as overdue */
   todayIso: string;
 }) {
@@ -32,6 +36,7 @@ export default function PlannedList({
             <th>Activity</th>
             <th>Duration</th>
             <th>Distance</th>
+            <th>Calories (est.)</th>
             <th>Notes</th>
             <th>
               <span hidden>Actions</span>
@@ -39,7 +44,9 @@ export default function PlannedList({
           </tr>
         </thead>
         <tbody>
-          {planned.map((a) => (
+          {planned.map((a) => {
+            const kcal = estimateCalories(a, weightKg);
+            return (
             <tr key={a.id}>
               <td>
                 {a.date}
@@ -52,6 +59,7 @@ export default function PlannedList({
                   ? "—"
                   : formatDistance(a.distanceKm, units)}
               </td>
+              <td>{kcal === null ? "—" : formatCalories(kcal)}</td>
               <td>{a.notes ?? ""}</td>
               <td>
                 <form action={completeActivityAction.bind(null, a.id)}>
@@ -65,7 +73,8 @@ export default function PlannedList({
                 />
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </>

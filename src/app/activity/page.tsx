@@ -84,7 +84,12 @@ async function ActivityView({ searchParams }: PageProps<"/activity">) {
         units={units}
         weightKg={weightKg}
       />
-      <PlannedList planned={planned} todayIso={todayIso} units={units} />
+      <PlannedList
+        planned={planned}
+        todayIso={todayIso}
+        units={units}
+        weightKg={weightKg}
+      />
       {showSampleData && (
         <form action={loadSampleData}>
           <p>
