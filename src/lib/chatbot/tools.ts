@@ -1,14 +1,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { addDays, format, parseISO, subDays } from "date-fns";
-import { revalidatePath } from "next/cache";
 import { parseActivityInput, type RawInput } from "@/lib/activity-input";
-import {
-  ActivityNotFoundError,
-  completeActivity,
-  createActivity,
-  getActivities,
-  getActivity,
-} from "@/lib/data";
+import { ActivityNotFoundError } from "@/lib/activity-errors";
+import type * as data from "@/lib/data";
 import {
   ACTIVITY_TYPES,
   type ActivityStatus,
@@ -88,6 +82,20 @@ export const SIGNED_IN_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+/**
+ * What the tools need from the outside world. The app uses live-env.ts (Supabase
+ * via data.ts); the eval script passes an in-memory store, so the same tool code
+ * runs against fake data.
+ */
+export interface ToolEnv {
+  store: Pick<
+    typeof data,
+    "getActivities" | "getActivity" | "createActivity" | "completeActivity"
+  >;
+  /** Called after any write, e.g. to refresh cached pages. */
+  onWrite: () => void;
+}
+
 export interface ToolOutcome {
   content: string;
   isError?: boolean;
@@ -103,7 +111,10 @@ function fail(message: string): ToolOutcome {
   return { content: message, isError: true };
 }
 
-async function history(input: Record<string, unknown>): Promise<ToolOutcome> {
+async function history(
+  env: ToolEnv,
+  input: Record<string, unknown>,
+): Promise<ToolOutcome> {
   const from = asString(input.from);
   const to = asString(input.to);
   if (!ISO_DATE.test(from) || !ISO_DATE.test(to) || from > to) {
@@ -114,16 +125,17 @@ async function history(input: Record<string, unknown>): Promise<ToolOutcome> {
     return fail('status must be "completed", "planned" or "all".');
   }
 
-  return { content: await describeRange(from, to, status ?? "completed") };
+  return { content: await describeRange(env, from, to, status ?? "completed") };
 }
 
 /** JSON digest of the user's activities in a range: totals per status+type and the latest entries. */
 async function describeRange(
+  env: ToolEnv,
   from: string,
   to: string,
   status: ActivityStatus | "all",
 ): Promise<string> {
-  const rows = await getActivities({ from, to, status });
+  const rows = await env.store.getActivities({ from, to, status });
 
   const byType: Record<string, { sessions: number; minutes: number; km: number }> = {};
   for (const a of rows) {
@@ -160,10 +172,18 @@ async function describeRange(
  * null if the lookup fails, so the prompt can say history is unavailable instead
  * of letting the model guess.
  */
-export async function loadHistorySnapshot(today: Date): Promise<string | null> {
+export async function loadHistorySnapshot(
+  today: Date,
+  env: ToolEnv,
+): Promise<string | null> {
   const iso = (d: Date) => format(d, "yyyy-MM-dd");
   try {
-    return await describeRange(iso(subDays(today, 30)), iso(addDays(today, 30)), "all");
+    return await describeRange(
+      env,
+      iso(subDays(today, 30)),
+      iso(addDays(today, 30)),
+      "all",
+    );
   } catch (e) {
     console.error("chatbot history snapshot failed", e);
     return null;
@@ -171,6 +191,7 @@ export async function loadHistorySnapshot(today: Date): Promise<string | null> {
 }
 
 async function write(
+  env: ToolEnv,
   status: ActivityStatus,
   input: Record<string, unknown>,
   today: Date,
@@ -188,9 +209,8 @@ async function write(
     return fail(`Not saved. ${Object.values(result.errors).join(" ")}`);
   }
 
-  await createActivity(result.value);
-  revalidatePath("/activity");
-  revalidatePath("/charts");
+  await env.store.createActivity(result.value);
+  env.onWrite();
   const v = result.value;
   return {
     content: `Saved as ${status}: ${v.type}, ${v.durationMin} min${v.distanceKm !== null ? `, ${v.distanceKm} km` : ""} on ${v.date}.`,
@@ -201,6 +221,7 @@ async function write(
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function complete(
+  env: ToolEnv,
   input: Record<string, unknown>,
   today: Date,
 ): Promise<ToolOutcome> {
@@ -211,11 +232,10 @@ async function complete(
   }
 
   try {
-    const planned = await getActivity(id);
+    const planned = await env.store.getActivity(id);
     if (!planned || planned.status !== "planned") throw new ActivityNotFoundError();
-    const date = await completeActivity(id, format(today, "yyyy-MM-dd"));
-    revalidatePath("/activity");
-    revalidatePath("/charts");
+    const date = await env.store.completeActivity(id, format(today, "yyyy-MM-dd"));
+    env.onWrite();
     return {
       content: `Marked done: ${planned.type}, ${planned.durationMin} min${planned.distanceKm !== null ? `, ${planned.distanceKm} km` : ""}, now recorded on ${date} (${format(parseISO(date), "EEEE")}).`,
       wrote: true,
@@ -235,6 +255,7 @@ export async function runTool(
   name: string,
   input: unknown,
   today: Date,
+  env: ToolEnv,
 ): Promise<ToolOutcome> {
   const args =
     typeof input === "object" && input !== null
@@ -243,13 +264,13 @@ export async function runTool(
   try {
     switch (name) {
       case "get_activity_history":
-        return await history(args);
+        return await history(env, args);
       case "log_activity":
-        return await write("completed", args, today);
+        return await write(env, "completed", args, today);
       case "plan_activity":
-        return await write("planned", args, today);
+        return await write(env, "planned", args, today);
       case "complete_planned_activity":
-        return await complete(args, today);
+        return await complete(env, args, today);
       default:
         return fail(`Unknown tool: ${name}`);
     }

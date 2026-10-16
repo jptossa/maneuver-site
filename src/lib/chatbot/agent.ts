@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { CHATBOT_MODEL, LIMITS, REPRESENTATIVE } from "./config";
 import { buildSystemPrompt } from "./prompt";
-import { SIGNED_IN_TOOLS, loadHistorySnapshot, runTool } from "./tools";
+import { SIGNED_IN_TOOLS, loadHistorySnapshot, runTool, type ToolEnv } from "./tools";
 
 export interface ChatTurn {
   role: "user" | "assistant";
@@ -26,6 +26,8 @@ const FALLBACK_REPLY = `I'm going to hand this one to a human. ${REPRESENTATIVE.
 export async function runAgent(opts: {
   history: ChatTurn[];
   signedIn: boolean;
+  /** Where signed-in tools read and write. The app passes liveEnv; evals pass an in-memory one. */
+  env: ToolEnv;
   today?: Date;
   onText?: (delta: string) => void;
   /** Aborts the model call, e.g. when the browser disconnects. */
@@ -33,7 +35,7 @@ export async function runAgent(opts: {
 }): Promise<AgentReply> {
   const today = opts.today ?? new Date();
   const client = new Anthropic();
-  const snapshot = opts.signedIn ? await loadHistorySnapshot(today) : undefined;
+  const snapshot = opts.signedIn ? await loadHistorySnapshot(today, opts.env) : undefined;
   const system = buildSystemPrompt({ signedIn: opts.signedIn, today, snapshot });
   const tools = opts.signedIn ? SIGNED_IN_TOOLS : undefined;
   const messages: Anthropic.MessageParam[] = opts.history.map((m) => ({
@@ -96,7 +98,7 @@ export async function runAgent(opts: {
     messages.push({ role: "assistant", content: response.content });
     const results: Anthropic.ToolResultBlockParam[] = [];
     for (const call of toolCalls) {
-      const outcome = await runTool(call.name, call.input, today);
+      const outcome = await runTool(call.name, call.input, today, opts.env);
       wrote ||= outcome.wrote === true;
       results.push({
         type: "tool_result",
