@@ -97,6 +97,8 @@ html {
 }
 
 body {
+  position: relative;
+  isolation: isolate;
   margin: 0;
   min-height: 100vh;
   display: flex;
@@ -731,14 +733,98 @@ section[aria-label="Weekly activity guidelines"] label {
 
 /* ---------- Landing page ---------- */
 
-.hero {
-  padding: 24px 0 8px;
+/*
+ * Full-bleed photo behind the header and hero, fading into the page background
+ * toward the bottom. body is the positioning context (and its own stacking
+ * context, so the z-index: -1 backdrop paints above body's background).
+ */
+.hero-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: -1;
+  height: min(680px, 92vh);
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 38%, transparent 94%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 38%, transparent 94%);
 }
 
-.hero > p:not(.cta) {
-  max-width: 40rem;
+/* --header-offset ≈ the sticky header's height (it wraps to two or three rows on narrow screens). */
+.hero-photo-frame {
+  position: absolute;
+  inset: var(--header-offset, 64px) 0 0;
+}
+
+@media (max-width: 800px) {
+  .hero-backdrop {
+    --header-offset: 108px;
+  }
+}
+
+@media (max-width: 560px) {
+  .hero-backdrop {
+    --header-offset: 130px;
+  }
+
+  /* Portrait crop of a landscape photo: favor the right-hand fighter. */
+  .hero-photo {
+    object-position: 76% 0%;
+  }
+}
+
+/* Top-aligned so the fighters' heads stay in frame; any cropping happens at the bottom. */
+.hero-photo {
+  object-fit: cover;
+  object-position: 60% 0%;
+}
+
+/* Theme-colored scrim: dense behind the text on the left, letting the photo through on the right. */
+.hero-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--bg) 92%, transparent) 0%,
+      color-mix(in srgb, var(--bg) 76%, transparent) 36%,
+      color-mix(in srgb, var(--bg) 4%, transparent) 80%
+    ),
+    linear-gradient(0deg, rgb(124 92 191 / 0.22), transparent 55%);
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  min-height: 400px;
+  padding: 40px 0 24px;
+}
+
+.hero-content {
+  max-width: 34rem;
+}
+
+.hero-content > p:not(.cta) {
   font-size: 1.1rem;
-  color: var(--muted);
+  color: var(--text);
+}
+
+@media (max-width: 560px) {
+  .hero {
+    min-height: 0;
+    padding: 24px 0 16px;
+  }
+
+  .hero-backdrop::after {
+    background:
+      linear-gradient(
+        0deg,
+        color-mix(in srgb, var(--bg) 82%, transparent),
+        color-mix(in srgb, var(--bg) 64%, transparent)
+      ),
+      linear-gradient(0deg, rgb(124 92 191 / 0.22), transparent 55%);
+  }
 }
 
 .cta {
