@@ -15,7 +15,7 @@ async function SignupForm({ searchParams }: PageProps<"/signup">) {
     return (
       <p>
         Almost there — check your email for a confirmation link, then{" "}
-        <Link href="/login">log in</Link>.
+        <Link href="/login">log in</Link>. (Look in spam if it&apos;s shy.)
       </p>
     );
   }

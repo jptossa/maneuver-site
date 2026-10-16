@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cinzel, Inter } from "next/font/google";
+import SiteFooter from "@/components/SiteFooter";
 import SiteNav from "@/components/SiteNav";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -36,9 +37,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <SiteNav />
         </header>
         <main>{children}</main>
-        <footer>
-          <small>© Maneuver</small>
-        </footer>
+        <SiteFooter />
       </body>
     </html>
   );

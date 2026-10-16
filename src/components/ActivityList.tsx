@@ -27,7 +27,12 @@ export default function ActivityList({
   weightKg: number | null;
 }) {
   if (activities.length === 0) {
-    return <p>No activity recorded for this period.</p>;
+    return (
+      <p>
+        No activity recorded for this period. Rest is part of training, but so
+        is showing up.
+      </p>
+    );
   }
 
   if (period.scale === "day") {
