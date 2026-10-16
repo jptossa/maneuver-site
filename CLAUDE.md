@@ -43,9 +43,10 @@ There is no test runner configured yet.
 
 Pages (`/` landing, `/activity` tracker table, `/charts` graphs) are thin: resolve period → `getActivities` → aggregate → render shared components in `src/components/`.
 
-**Activity assistant (chatbot)**: `/assistant` page (`ChatWidget`, client) → `POST /api/chat` (`src/app/api/chat/route.ts`) → `runAgent` (`src/lib/chatbot/agent.ts`), a manual tool loop on the Anthropic Messages API (`@anthropic-ai/sdk`, non-streaming, model `CHATBOT_MODEL` defaulting to `claude-haiku-5-5`, `effort: "low"`).
+**Activity assistant (chatbot)**: `/assistant` page (`ChatWidget`, client) → `POST /api/chat` (`src/app/api/chat/route.ts`) → `runAgent` (`src/lib/chatbot/agent.ts`), a manual tool loop on the Anthropic Messages API (`@anthropic-ai/sdk`, streamed via `client.messages.stream`, model `CHATBOT_MODEL` defaulting to `claude-haiku-5-5`, `effort: "low"`).
 - Everything tunable is in `src/lib/chatbot/config.ts` (model, the fictional escalation rep "Sifu Sensei" + phone, limits). Persona/scope/escalation rules are the system prompt in `prompt.ts`, built per request (it embeds today's date).
 - Logged-out visitors get no tools (suggestions only). Signed-in users (checked with `auth.getClaims()` in the route) get `get_activity_history`, `log_activity`, `plan_activity` from `tools.ts`; writes go through `parseActivityInput` + `createActivity` — the same rules and data seam as the forms. The assistant cannot edit/delete.
+- Wire format: a successful `/api/chat` response is NDJSON `ChatEvent`s (`text` deltas, then `done` or `error`; see `src/lib/chatbot/protocol.ts`). Failures before streaming starts (400/429/503) are plain JSON `{ error }` with that status, so `ChatWidget` checks `res.ok` first. Client disconnects abort the model call via `request.signal`.
 - The client keeps only plain-text turns and resends them each request; tool calls/thinking blocks never leave `runAgent`. `ANTHROPIC_API_KEY` is server-only; without it the route answers 503. Rate limiting (`rate-limit.ts`) is in-memory best-effort; the Anthropic console spend limit is the real backstop.
 
 **Supabase / auth**:
