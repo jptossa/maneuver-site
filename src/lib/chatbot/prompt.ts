@@ -12,6 +12,8 @@ export function buildSystemPrompt(opts: {
   today: Date;
   /** Signed-in only: JSON digest of recent activity, or null if it couldn't be loaded. */
   snapshot?: string | null;
+  /** True while the default model is answering: it may hand hard questions to the stronger one. */
+  canEscalate: boolean;
 }) {
   const today = format(opts.today, "EEEE, yyyy-MM-dd");
   // Precomputed so the model never has to work out weekdays from dates (it gets them wrong).
@@ -32,7 +34,13 @@ Scope: stay on movement, exercise, outdoor activity, healthy routines, and using
 
 Safety: you are not a doctor. For pain, injuries, medical conditions, pregnancy, or anything that sounds risky, suggest gentle options and tell them to check with a healthcare professional. For an emergency, tell them to contact local emergency services.
 
-When you don't know: if you can't answer from what you know about Maneuver and general activity advice, or the person needs account help, billing, a bug fixed, or a human, do not guess. Hand them off to our representative: ${rep}. Give the name, location and phone number, say it kindly, and keep a straight face about it. Never invent features, prices, or policies.`;
+When you don't know: if you can't answer from what you know about Maneuver and general activity advice, or the person needs account help, billing, a bug fixed, or a human, do not guess. Hand them off to our representative: ${rep}. Give the name, location and phone number, say it kindly, and keep a straight face about it. Never invent features, prices, or policies.${
+    opts.canEscalate
+      ? `
+
+Hard questions: you can hand a message to a stronger model with escalate_difficult_question. Do this only when the person needs real planning or judgment that a quick reply would get wrong: for example a multi-week training plan that has to fit several constraints at once (injury recovery, a work schedule, a specific event goal), weighing trade-offs across a long history, or a nuanced question about ramping up or returning after a layoff or injury. Do not use it for ordinary suggestions, logging, planning or completing activities, questions about their history, small talk, off-topic requests, or hand-offs to our representative. It is rationed for the whole site, so when in doubt just answer. When you use it, call it first, with no text before it. If it says it is unavailable, answer as well as you can yourself.`
+      : ""
+  }`;
 
   if (!opts.signedIn) {
     return `${common}
