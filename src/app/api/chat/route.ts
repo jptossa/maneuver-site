@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { runAgent, type ChatTurn } from "@/lib/chatbot/agent";
 import { LIMITS } from "@/lib/chatbot/config";
 import { claimSonnetUse, liveEnv } from "@/lib/chatbot/live-env";
-import { DEFAULT_UNITS, parseUnits, type UnitSystem } from "@/lib/units";
+import { DEFAULT_UNITS, parseUnits, parseWeightKg, type UnitSystem } from "@/lib/units";
 import type { ChatEvent } from "@/lib/chatbot/protocol";
 import { allowRequest } from "@/lib/chatbot/rate-limit";
 import { getSupabaseEnv } from "@/lib/supabase/env";
@@ -61,11 +61,13 @@ export async function POST(request: Request) {
   // Signed-in users get history-aware tools. RLS (not this check) protects their data.
   let userId: string | null = null;
   let units: UnitSystem = DEFAULT_UNITS;
+  let weightKg: number | null = null;
   if (getSupabaseEnv()) {
     const supabase = await createClient();
     const { data } = await supabase.auth.getClaims();
     userId = typeof data?.claims.sub === "string" ? data.claims.sub : null;
     units = parseUnits(data?.claims.user_metadata?.units);
+    weightKg = parseWeightKg(data?.claims.user_metadata?.weightKg);
   }
   const signedIn = userId !== null;
 
@@ -97,6 +99,7 @@ export async function POST(request: Request) {
           signedIn,
           env: liveEnv,
           units,
+          weightKg,
           claimSonnet: claimSonnetUse,
           signal: request.signal,
           onText: (delta) => send({ type: "text", delta }),

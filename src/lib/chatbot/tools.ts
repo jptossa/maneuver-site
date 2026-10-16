@@ -3,8 +3,12 @@ import { addDays, format, parseISO, subDays } from "date-fns";
 import { parseActivityInput, type RawInput } from "@/lib/activity-input";
 import { ActivityNotFoundError } from "@/lib/activity-errors";
 import type * as data from "@/lib/data";
+import { estimateCalories } from "@/lib/calories";
+import { guidelineProgress } from "@/lib/guidelines";
+import { intensityOf, metEntry } from "@/lib/met";
 import {
   ACTIVITY_TYPES,
+  type Activity,
   type ActivityStatus,
 } from "@/lib/types";
 import {
@@ -128,6 +132,7 @@ async function history(
   env: ToolEnv,
   input: Record<string, unknown>,
   units: UnitSystem,
+  weightKg: number | null,
 ): Promise<ToolOutcome> {
   const from = asString(input.from);
   const to = asString(input.to);
@@ -139,31 +144,33 @@ async function history(
     return fail('status must be "completed", "planned" or "all".');
   }
 
-  return {
-    content: await describeRange(env, from, to, status ?? "completed", units),
-  };
+  const rows = await env.store.getActivities({ from, to, status: status ?? "completed" });
+  return { content: JSON.stringify(digest(rows, from, to, units, weightKg)) };
 }
 
 /**
- * JSON digest of the user's activities in a range: totals per status+type and the latest entries.
- * Distances are in the user's preferred unit (`distanceUnit`), never raw km.
+ * Digest of the user's activities in a range: totals per status+type and the latest entries.
+ * Distances are in the user's preferred unit (`distanceUnit`), never raw km. Calories are
+ * Compendium-based estimates and only present when the user has set their weight.
  */
-async function describeRange(
-  env: ToolEnv,
+function digest(
+  rows: Activity[],
   from: string,
   to: string,
-  status: ActivityStatus | "all",
   units: UnitSystem,
-): Promise<string> {
-  const rows = await env.store.getActivities({ from, to, status });
-
+  weightKg: number | null,
+) {
   // Sum in km (storage unit), convert once at the end to avoid compounding rounding.
-  const totals: Record<string, { sessions: number; minutes: number; km: number }> = {};
+  const totals: Record<
+    string,
+    { sessions: number; minutes: number; km: number; kcal: number }
+  > = {};
   for (const a of rows) {
-    const t = (totals[`${a.status}:${a.type}`] ??= { sessions: 0, minutes: 0, km: 0 });
+    const t = (totals[`${a.status}:${a.type}`] ??= { sessions: 0, minutes: 0, km: 0, kcal: 0 });
     t.sessions += 1;
     t.minutes += a.durationMin;
     t.km += a.distanceKm ?? 0;
+    t.kcal += estimateCalories(a, weightKg) ?? 0;
   }
   const byType = Object.fromEntries(
     Object.entries(totals).map(([key, t]) => [
@@ -172,30 +179,38 @@ async function describeRange(
         sessions: t.sessions,
         minutes: t.minutes,
         distance: displayDistance(t.km, units),
+        ...(weightKg !== null && { estimatedKcal: t.kcal }),
       },
     ]),
   );
 
   const recent = rows.slice(-LIMITS.historyRows);
-  return JSON.stringify({
+  return {
     range: { from, to },
     distanceUnit: distanceUnit(units),
+    // False means no calorie figures are included: tell the user to set their weight, don't guess.
+    weightKnown: weightKg !== null,
     totalEntries: rows.length,
     showingMostRecent: recent.length,
     totalsByStatusAndType: byType,
-    activities: recent.map((a) => ({
-      // Only planned entries expose an id: it is what complete_planned_activity takes.
-      ...(a.status === "planned" && { id: a.id }),
-      date: a.date,
-      // Computed here: models are unreliable at date -> weekday arithmetic.
-      weekday: format(parseISO(a.date), "EEEE"),
-      type: a.type,
-      status: a.status,
-      minutes: a.durationMin,
-      distance: a.distanceKm === null ? null : displayDistance(a.distanceKm, units),
-      notes: a.notes,
-    })),
-  });
+    activities: recent.map((a) => {
+      const met = metEntry(a.type, a.durationMin, a.distanceKm);
+      return {
+        // Only planned entries expose an id: it is what complete_planned_activity takes.
+        ...(a.status === "planned" && { id: a.id }),
+        date: a.date,
+        // Computed here: models are unreliable at date -> weekday arithmetic.
+        weekday: format(parseISO(a.date), "EEEE"),
+        type: a.type,
+        status: a.status,
+        minutes: a.durationMin,
+        distance: a.distanceKm === null ? null : displayDistance(a.distanceKm, units),
+        ...(met && { intensity: intensityOf(met.met) }),
+        ...(weightKg !== null && { estimatedKcal: estimateCalories(a, weightKg) }),
+        notes: a.notes,
+      };
+    }),
+  };
 }
 
 /**
@@ -208,16 +223,24 @@ export async function loadHistorySnapshot(
   today: Date,
   env: ToolEnv,
   units: UnitSystem,
+  weightKg: number | null,
 ): Promise<string | null> {
   const iso = (d: Date) => format(d, "yyyy-MM-dd");
   try {
-    return await describeRange(
-      env,
-      iso(subDays(today, 30)),
-      iso(addDays(today, 30)),
-      "all",
-      units,
+    const from = iso(subDays(today, 30));
+    const to = iso(addDays(today, 30));
+    const rows = await env.store.getActivities({ from, to, status: "all" });
+    // Weekly-target progress is counted here (the model is bad at arithmetic): completed
+    // activity from the last 7 days including today.
+    const weekFrom = iso(subDays(today, 6));
+    const weekTo = iso(today);
+    const week = rows.filter(
+      (a) => a.status === "completed" && a.date >= weekFrom && a.date <= weekTo,
     );
+    return JSON.stringify({
+      ...digest(rows, from, to, units, weightKg),
+      last7Days: { from: weekFrom, to: weekTo, ...guidelineProgress(week) },
+    });
   } catch (e) {
     console.error("chatbot history snapshot failed", e);
     return null;
@@ -300,6 +323,7 @@ export async function runTool(
   today: Date,
   env: ToolEnv,
   units: UnitSystem,
+  weightKg: number | null,
 ): Promise<ToolOutcome> {
   const args =
     typeof input === "object" && input !== null
@@ -308,7 +332,7 @@ export async function runTool(
   try {
     switch (name) {
       case "get_activity_history":
-        return await history(env, args, units);
+        return await history(env, args, units, weightKg);
       case "log_activity":
         return await write(env, "completed", args, today, units);
       case "plan_activity":

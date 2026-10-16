@@ -13,7 +13,8 @@ import { loadSampleData } from "@/app/activity/actions";
 import { getActivities, hasAnyActivity } from "@/lib/data";
 import { buildHref } from "@/lib/href";
 import { parseDate, parseScale, resolvePeriod } from "@/lib/period";
-import { getUnits } from "@/lib/preferences";
+import { totalCalories } from "@/lib/calories";
+import { getUnits, getWeightKg } from "@/lib/preferences";
 
 export const metadata: Metadata = { title: "Activity · Maneuver" };
 
@@ -34,6 +35,7 @@ async function ActivityView({ searchParams }: PageProps<"/activity">) {
   const activities = all.filter((a) => a.status === "completed");
   const planned = all.filter((a) => a.status === "planned");
   const units = await getUnits();
+  const weightKg = await getWeightKg();
   const buckets = bucketActivities(activities, period, "minutes", units);
   // Only offer sample data to accounts with no history at all, not for every empty period.
   const showSampleData = all.length === 0 && !(await hasAnyActivity());
@@ -56,12 +58,24 @@ async function ActivityView({ searchParams }: PageProps<"/activity">) {
       </p>
       <TimescaleTabs path="/activity" scale={scale} date={period.date} />
       <PeriodNav path="/activity" period={period} />
-      <SummaryCards summary={summarize(activities)} units={units} />
+      <SummaryCards
+        summary={summarize(activities)}
+        units={units}
+        calories={totalCalories(activities, weightKg)}
+      />
+      {weightKg === null && (
+        <p>
+          <small>
+            Enter your weight in the header to see estimated calories.
+          </small>
+        </p>
+      )}
       <ActivityList
         period={period}
         activities={activities}
         buckets={buckets}
         units={units}
+        weightKg={weightKg}
       />
       <PlannedList planned={planned} todayIso={todayIso} units={units} />
       {showSampleData && (
